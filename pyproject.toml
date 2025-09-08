@@ -1,0 +1,65 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mab-gpu"
+version = "0.1.0"
+description = "GPU-enabled Multi-Armed Bandits using PufferLib and PyTorch"
+readme = "README.md"
+requires-python = ">=3.9"
+authors = [{ name = "Mehul" }]
+dependencies = [
+  "numpy>=1.24",
+  "gymnasium>=0.29",
+  "matplotlib>=3.8",
+  "pufferlib",
+]
+
+[project.optional-dependencies]
+test = [
+  "pytest>=7",
+]
+
+[project.scripts]
+mab-gpu-runner = "MAB_GPU.runner_puffer:main"
+# Alias used in README for convenience
+runner = "MAB_GPU.runner_puffer:main"
+runner-ctx = "MAB_GPU.runner_puffer_advanced:main"
+mab-gpu-advanced = "MAB_GPU.runner_puffer_advanced:main"
+mab-gpu-puffer = "MAB_GPU.runner_puffer_native:main"
+
+[tool.setuptools]
+packages = ["MAB_GPU"]
+package-dir = {"MAB_GPU" = "."}
+
+[tool.uv]
+# Use `uv sync` and `uv run`.
+
+#[tool.uv.sources]
+# Prefer installing pufferlib from PyPI. To use a local checkout instead,
+# uncomment and point to a valid Python project path:
+# pufferlib = { path = "../PufferLib" }
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+exclude = ["**/.jj/**", "**/.git/**", "**/.venv/**"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = []
+
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true  # torch, gym may not have stubs
+warn_unused_configs = true
+disallow_untyped_defs = false
+check_untyped_defs = false
+no_implicit_optional = false
+files = ["."]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.12.12",
+]
