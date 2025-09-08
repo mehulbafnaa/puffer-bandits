@@ -190,14 +190,23 @@ def build_agent(cfg: Config, device: torch.device):
             return NeuralLinearTS(acfg, m=cfg.features, hidden=cfg.hidden, depth=cfg.depth, dropout=cfg.dropout, lam=cfg.linlam, v=cfg.linv, lr=cfg.lr, amp=cfg.amp)
         raise ValueError("unknown algo for contextual")
     else:
-        acfg = AgentCfg(k=cfg.k, num_envs=cfg.runs, device=device)
         key = cfg.algo.lower()
-        if key == "klucb":
-            return KLUCB(acfg, alpha=cfg.alpha)
-        if key in ("ducb", "discounted_ucb"):
-            return DiscountedUCB(acfg, c=2.0, discount=0.99)
-        if key in ("swucb", "sliding_window_ucb"):
-            return SlidingWindowUCB(acfg, c=2.0, window=200)
+        # EXP3 algorithms need CtxAgentCfg even for Bernoulli (d=1 for compatibility)
+        if key in ("exp3", "exp3ix"):
+            acfg = CtxAgentCfg(k=cfg.k, d=1, num_envs=cfg.runs, device=device)
+            if key == "exp3":
+                return EXP3(acfg, gamma=cfg.gamma, eta=cfg.eta)
+            if key == "exp3ix":
+                return EXP3IX(acfg, gamma=cfg.gamma, eta=cfg.eta)
+        else:
+            # Classical algorithms use AgentCfg
+            acfg = AgentCfg(k=cfg.k, num_envs=cfg.runs, device=device)
+            if key == "klucb":
+                return KLUCB(acfg, alpha=cfg.alpha)
+            if key in ("ducb", "discounted_ucb"):
+                return DiscountedUCB(acfg, c=2.0, discount=0.99)
+            if key in ("swucb", "sliding_window_ucb"):
+                return SlidingWindowUCB(acfg, c=2.0, window=200)
         raise ValueError("unknown algo for bernoulli")
 
 
