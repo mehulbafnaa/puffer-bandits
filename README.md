@@ -1,5 +1,7 @@
 # puffer-bandits
 
+Status: In active development (alpha). Interfaces and defaults may change. Expect rapid iteration and occasional breaking changes. If you hit issues, please open an issue or PR.
+
 Elegant, scalable bandit research toolkit built on PufferLib and uv. Environments run on CPU (vectorized); agents compute on your chosen `--device` (`cpu|mps|cuda`).
 
 ## Highlights
@@ -63,13 +65,18 @@ Elegant, scalable bandit research toolkit built on PufferLib and uv. Environment
 - Target the project venv: `uv run --active …`
 - Ensure `--runs` is divisible by `--num-workers` (or set `--num-workers 1`)
 - Neural methods are heavier; use fewer runs (e.g., 256–512) or fewer workers
-- For small contextual workloads, CPU can be faster than MPS; use `--force-device` to override heuristics
+- On small contextual workloads, CPU can outperform MPS; use `--force-device` to override heuristics
 
 ## Layout
 - Code: `puffer_bandits/{agents.py, agents_ctx/, core/, utils/, runner_*.py, puffer_envs.py, ui/tui.py}`
 - Scripts: `scripts/run_all.sh`, catalog `runs.txt`
 - Sample data: `data/synth_ctx.npz` (gitignored)
 
-## License
-- See `LICENSE`
+## Development
+- Code layout: `puffer_bandits/{agents.py, agents_ctx/, core/, utils/, runner_*.py, puffer_envs.py, ui/tui.py}`
+- Tests (optional): `uv run --active pytest -q`
+- Contributing: PRs welcome. Please include a small repro or smoke command.
 
+## License & Acknowledgements
+- License: see `LICENSE`
+- Thanks: PufferLib, PyTorch, Gymnasium, Rich, and uv
