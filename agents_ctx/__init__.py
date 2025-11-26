@@ -1,9 +1,20 @@
-from __future__ import annotations
+"""Legacy shim: re-export from puffer_bandits.agents_ctx.
 
-from .base import CtxAgentCfg, CtxAgent, pick_device
-from .lin import LinUCB, LinTS
-from .adversarial import EXP3, EXP3IX
-from .neural import NeuralTS, NeuralLinearTS
+This module exists for backward compatibility only. Prefer:
+    from puffer_bandits.agents_ctx import ...
+"""
+
+from puffer_bandits.agents_ctx import (  # type: ignore F401
+    CtxAgentCfg,
+    CtxAgent,
+    pick_device,
+    LinUCB,
+    LinTS,
+    EXP3,
+    EXP3IX,
+    NeuralTS,
+    NeuralLinearTS,
+)
 
 __all__ = [
     "CtxAgentCfg",
@@ -16,4 +27,3 @@ __all__ = [
     "NeuralTS",
     "NeuralLinearTS",
 ]
-
