@@ -60,6 +60,8 @@ __pypackages__/
 # Local symlinked resources (created during env installs)
 resources
 
-# Markdown notes at repo root (keep READMEs)
-/*.md
-!/README.md
+# Markdown: ignore all .md except README files
+**/*.md
+!README.md
+!**/README.md
+!**/[Rr][Ee][Aa][Dd][Mm][Ee].md
