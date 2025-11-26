@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import torch
-from MAB_GPU.advanced_agents import CtxAgentCfg, LinUCB
-from MAB_GPU.agents import KLUCB, AgentCfg
+from puffer_bandits.advanced_agents import CtxAgentCfg, LinUCB
+from puffer_bandits.agents import KLUCB, AgentCfg
 
 
 def test_klucb_deterministic_tie_break():
@@ -34,4 +34,3 @@ def test_linucb_reset_broadcast_shapes():
     # Diagonal entries should be 1/lam
     diag = agent.A_inv[0, 0].diag()
     assert torch.allclose(diag, torch.full((cfg.d,), 1.0 / 2.0))
-

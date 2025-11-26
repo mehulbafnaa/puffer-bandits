@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 
-from MAB_GPU.advanced_agents import CtxAgentCfg, LinTS, NeuralLinearTS
+from puffer_bandits.advanced_agents import CtxAgentCfg, LinTS, NeuralLinearTS
 
 
 def test_lints_safe_cholesky_no_crash():
@@ -31,4 +31,3 @@ def test_neurallinear_safe_cholesky_no_crash():
     agent.A_inv[0, 0, :, :] = bad
     obs = torch.randn((cfg.num_envs, cfg.k, cfg.d), device=device)
     _ = agent.select_actions(1, obs)
-

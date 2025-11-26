@@ -15,14 +15,14 @@ CORES = os.cpu_count() or 1
 from pufferlib.emulation import GymnasiumPufferEnv
 from pufferlib.vector import Multiprocessing
 
-from MAB_GPU.agents import (
+from .agents import (
     KLUCB,
     AgentCfg,
     DiscountedUCB,
     SlidingWindowUCB,
 )
-from MAB_GPU.bandit_env import BernoulliBanditEnv
-from MAB_GPU.utils.device import pick_device
+from .bandit_env import BernoulliBanditEnv
+from .utils.device import pick_device
 try:
     import matplotlib.pyplot as plt  # optional plotting
 except Exception:
@@ -58,7 +58,7 @@ class Config:
 
 
 def parse_args() -> Config:
-    p = argparse.ArgumentParser("GPU MAB experiments (PufferLib)")
+    p = argparse.ArgumentParser("Bandit experiments (PufferLib)")
     # Problem
     p.add_argument("--algo", type=str, choices=["klucb", "ducb", "swucb"], default="klucb")
     p.add_argument("--k", type=int, default=10)
@@ -171,18 +171,11 @@ def main() -> None:
     agent.reset()
     if cfg.debug_devices:
         # Print initial devices and wrap agent for one-time logging
-        try:
-            from .devices_debug import (  # type: ignore
-                _desc,
-                print_agent_state_devices,
-                wrap_agent_for_debug,
-            )
-        except Exception:
-            from MAB_GPU.devices_debug import (  # type: ignore
-                _desc,
-                print_agent_state_devices,
-                wrap_agent_for_debug,
-            )
+        from .devices_debug import (  # type: ignore
+            _desc,
+            print_agent_state_devices,
+            wrap_agent_for_debug,
+        )
         print("[device] torch backend device:", device)
         print_agent_state_devices(agent)
         # Observations are numpy on CPU via PufferLib
@@ -250,10 +243,7 @@ def main() -> None:
             agent.update(actions, rewards)
         if cfg.debug_devices and t == 1:
             # Show device flow at first step
-            try:
-                from .devices_debug import _desc  # type: ignore
-            except Exception:
-                from MAB_GPU.devices_debug import _desc  # type: ignore
+            from .devices_debug import _desc  # type: ignore
             print("[device] env.step <- actions:", _desc(atn_np))
             print("[device] env.step -> rewards:", _desc(r))
             print("[device] agent.update <- rewards (torch):", _desc(rewards))
@@ -363,7 +353,6 @@ def main() -> None:
         print("Warning: matplotlib not available; skipping plots")
 
     if cfg.save_csv:
-        import os
         os.makedirs(cfg.outdir, exist_ok=True)
         path = os.path.join(cfg.outdir, "summary.csv")
         with open(path, "a", newline="") as f:

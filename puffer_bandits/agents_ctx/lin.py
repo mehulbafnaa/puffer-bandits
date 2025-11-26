@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import torch
-from MAB_GPU.core.linear import sherman_morrison_update
-from MAB_GPU.utils.constants import TINY
-from MAB_GPU.utils.linalg import safe_cholesky
+from ..core.linear import sherman_morrison_update
+from ..utils.constants import TINY
+from ..utils.linalg import safe_cholesky
 from .base import CtxAgent, CtxAgentCfg
 
 
@@ -89,3 +89,4 @@ class LinTS(CtxAgent):
         Ainv_new = sherman_morrison_update(Ainv_sel, x_sel)
         self.A_inv[batch, idx, :, :] = Ainv_new
         self.b[batch, idx, :] = self.b[batch, idx, :] + (r * x_sel)
+

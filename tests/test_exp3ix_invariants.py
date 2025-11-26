@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import torch
-from MAB_GPU.agents_ctx import CtxAgentCfg, EXP3IX
+from puffer_bandits.agents_ctx import CtxAgentCfg, EXP3IX
 
 
 def test_exp3ix_probs_sum_to_one_and_update_increases_selected_weight():
@@ -19,4 +19,3 @@ def test_exp3ix_probs_sum_to_one_and_update_increases_selected_weight():
     for i in range(cfg.num_envs):
         a = actions[i].item()
         assert ag.w[i, a] > w_before[i, a]
-

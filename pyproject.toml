@@ -3,7 +3,7 @@ requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mab-gpu"
+name = "puffer-bandits"
 version = "0.1.0"
 description = "GPU-enabled Multi-Armed Bandits using PufferLib and PyTorch"
 readme = "README.md"
@@ -13,7 +13,8 @@ dependencies = [
   "numpy>=1.24",
   "gymnasium>=0.29",
   "matplotlib>=3.8",
-  "pufferlib",
+  "pufferlib>=0.5",
+  "rich>=13.7",
 ]
 
 [project.optional-dependencies]
@@ -22,16 +23,16 @@ test = [
 ]
 
 [project.scripts]
-mab-gpu-runner = "MAB_GPU.runner_puffer:main"
+puffer-bandits-runner = "puffer_bandits.runner_puffer:main"
 # Alias used in README for convenience
-runner = "MAB_GPU.runner_puffer:main"
-runner-ctx = "MAB_GPU.runner_puffer_advanced:main"
-mab-gpu-advanced = "MAB_GPU.runner_puffer_advanced:main"
-mab-gpu-puffer = "MAB_GPU.runner_puffer_native:main"
+runner = "puffer_bandits.runner_puffer:main"
+runner-ctx = "puffer_bandits.runner_puffer_advanced:main"
+puffer-bandits-advanced = "puffer_bandits.runner_puffer_advanced:main"
+puffer-bandits-native = "puffer_bandits.runner_puffer_native:main"
 
 [tool.setuptools]
-packages = ["MAB_GPU"]
-package-dir = {"MAB_GPU" = "."}
+packages = ["puffer_bandits"]
+package-dir = {"puffer_bandits" = "puffer_bandits"}
 
 [tool.uv]
 # Use `uv sync` and `uv run`.

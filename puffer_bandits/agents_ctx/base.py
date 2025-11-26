@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+
 import torch
-from MAB_GPU.utils.device import pick_device as _pick_device
+
+from ..utils.device import pick_device as _pick_device
 
 
-def pick_device(preferred: str | None = None) -> torch.device:  # re-export shim
+def pick_device(preferred: str | None = None) -> torch.device:
     return _pick_device(preferred)
 
 
 @dataclass
 class CtxAgentCfg:
     k: int
-    d: int  # context dimension
+    d: int
     num_envs: int
     device: torch.device
 
@@ -28,14 +30,14 @@ class CtxAgent:
         self.device = cfg.device
         self.rng = rng or torch.Generator(device=self.device)
 
-    def reset(self) -> None:  # pragma: no cover - abstract
+    def reset(self) -> None:
         raise NotImplementedError
 
     @torch.no_grad()
-    def select_actions(self, t: int, obs: torch.Tensor) -> torch.LongTensor:  # pragma: no cover - abstract
+    def select_actions(self, t: int, obs: torch.Tensor | None = None) -> torch.LongTensor:
         raise NotImplementedError
 
     @torch.no_grad()
-    def update(self, actions: torch.LongTensor, rewards: torch.Tensor, obs: torch.Tensor) -> None:  # pragma: no cover - abstract
+    def update(self, actions: torch.LongTensor, rewards: torch.Tensor, obs: torch.Tensor | None = None) -> None:
         raise NotImplementedError
 

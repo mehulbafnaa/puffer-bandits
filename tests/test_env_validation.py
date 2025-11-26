@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from MAB_GPU.bandit_env import BernoulliBanditEnv
-from MAB_GPU.contextual_env import ContextualBanditEnv
+from puffer_bandits.bandit_env import BernoulliBanditEnv
+from puffer_bandits.contextual_env import ContextualBanditEnv
 
 
 def test_bernoulli_action_bounds():
@@ -40,4 +40,3 @@ def test_contextual_logits_and_bounds():
         assert False, "expected ValueError for out-of-range action"
     except ValueError:
         pass
-

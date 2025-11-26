@@ -4,10 +4,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from MAB_GPU.core.linear import sherman_morrison_update
-from MAB_GPU.utils.linalg import safe_cholesky
+from ..core.linear import sherman_morrison_update
+from ..utils.linalg import safe_cholesky
 from .base import CtxAgent, CtxAgentCfg
-from MAB_GPU.utils.constants import TINY
+from ..utils.constants import TINY
 
 
 class NeuralLinearTS(CtxAgent):
@@ -213,3 +213,4 @@ class NeuralTS(CtxAgent):
             loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, rb)
             loss.backward()
             optim.step()
+

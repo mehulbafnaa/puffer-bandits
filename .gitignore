@@ -19,7 +19,15 @@ dist/
 # Tools and caches
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 *.log
+.cache/
+
+# uv local cache (when using UV_CACHE_DIR)
+.uv-cache/
+
+# Matplotlib cache (when MPLCONFIGDIR is set)
+.matplotlib_cache/
 
 # Editors/OS
 .DS_Store
@@ -29,7 +37,29 @@ dist/
 # Generated plots and outputs
 plots_gpu*/
 plots_gpu_mps*/
+sweeps_logs/
+
+# Local datasets and large artifacts
+data/
+
+# Notebook/editor detritus
+.ipynb_checkpoints/
+*.swp
+*.swo
+*~
+
+# Coverage reports
+.coverage
+coverage.xml
+htmlcov/
+
+# Python packaging scratch
+pip-wheel-metadata/
+__pypackages__/
 
 # Local symlinked resources (created during env installs)
 resources
 
+# Markdown notes at repo root (keep READMEs)
+/*.md
+!/README.md

@@ -39,25 +39,23 @@ class AgentDebugWrapper(Agent):  # type: ignore[misc]
     def __getattr__(self, name):  # fallback to inner
         return getattr(self._inner, name)
 
-    def reset(self) -> None:
-        return self._inner.reset()
-
     @torch.no_grad()
-    def select_actions(self, t: int) -> torch.LongTensor:
-        actions = self._inner.select_actions(t)
+    def select_actions(self, t: int):  # type: ignore[override]
+        a = self._inner.select_actions(t)
         if not self._printed_select:
-            print("[device] select_actions -> actions:", _desc(actions))
+            print("[device] select_actions -> actions:", _desc(a))
             self._printed_select = True
-        return actions
+        return a
 
     @torch.no_grad()
-    def update(self, actions: torch.LongTensor, rewards: torch.Tensor) -> None:
+    def update(self, actions, rewards, *args, **kwargs):  # type: ignore[override]
+        out = self._inner.update(actions, rewards, *args, **kwargs)
         if not self._printed_update:
             print("[device] update <- actions:", _desc(actions))
             print("[device] update <- rewards:", _desc(rewards))
             self._printed_update = True
-        return self._inner.update(actions, rewards)
+        return out
 
 
-def wrap_agent_for_debug(agent: Agent) -> AgentDebugWrapper:  # type: ignore[override]
+def wrap_agent_for_debug(agent: Agent) -> Agent:  # type: ignore[override]
     return AgentDebugWrapper(agent)

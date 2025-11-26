@@ -85,7 +85,7 @@ class RichTUI:
         )
         self._task = self._progress.add_task("run", total=T)
 
-        header = "MAB GPU • Native Puffer"
+        header = "puffer-bandits • Native Puffer"
         if title:
             header = f"{header} • {title}"
         layout["header"].update(self.Panel(f"[bold magenta]{header} • Device: {device_desc}"))

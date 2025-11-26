@@ -74,3 +74,4 @@ def memory_stats(device: torch.device) -> dict[str, Any]:
         except Exception:
             return {}
     return {}
+

@@ -104,23 +104,23 @@ for DEV in $DEVICES; do
     # --- Smoke (quick) ---
     if [[ "${DO_SMOKE}" == "1" ]]; then
       run "smoke_klucb" "$LOGDIR/smoke_klucb.log" \
-        mab-gpu-puffer --env bernoulli --algo klucb --k "$K" --T 300 --runs 256 \
+        puffer-bandits-native --env bernoulli --algo klucb --k "$K" --T 300 --runs 256 \
         --vector serial --device "$DEV" --tui --log-every 50 --seed "$SEED"
 
       run "smoke_linucb" "$LOGDIR/smoke_linucb.log" \
-        mab-gpu-puffer --env contextual --algo linucb --k "$K" --d "$D" --T 300 --runs 128 \
+        puffer-bandits-native --env contextual --algo linucb --k "$K" --d "$D" --T 300 --runs 128 \
         --vector serial --device "$DEV" --tui --log-every 50 --seed "$SEED" --alpha $(echo $ALPHAS | awk '{print $1}') --lam 1.0
     fi
 
     # --- Throughput (MP) ---
     if [[ "${DO_THROUGHPUT}" == "1" ]]; then
       run "tp_klucb" "$LOGDIR/tp_klucb.log" \
-        mab-gpu-puffer --env bernoulli --algo klucb --k "$K" --T "$T_BASIC" --runs "$RUNS_BASIC" \
+        puffer-bandits-native --env bernoulli --algo klucb --k "$K" --T "$T_BASIC" --runs "$RUNS_BASIC" \
         --vector mp --num-workers "$WORKERS" --device "$DEV" --tui --log-every 200 --seed "$SEED"
 
       for V in $VS; do
         run "tp_lints_v${V}" "$LOGDIR/tp_lints_v${V}.log" \
-          mab-gpu-puffer --env contextual --algo lints --k "$K" --d "$D" --T "$T_CTX" --runs "$RUNS_CTX" \
+          puffer-bandits-native --env contextual --algo lints --k "$K" --d "$D" --T "$T_CTX" --runs "$RUNS_CTX" \
           --vector mp --num-workers "$WORKERS" --device "$DEV" --tui --log-every 100 --seed "$SEED" --v "$V" --lam 1.0
       done
     fi
@@ -128,12 +128,12 @@ for DEV in $DEVICES; do
     # --- Neural (heavier) ---
     if [[ "${DO_NEURAL}" == "1" ]]; then
       run "neuralts" "$LOGDIR/neuralts.log" \
-        mab-gpu-puffer --env contextual --algo neuralts --k "$K" --d "$D" --T "$T_NEURAL" --runs "$RUNS_NEURAL" \
+        puffer-bandits-native --env contextual --algo neuralts --k "$K" --d "$D" --T "$T_NEURAL" --runs "$RUNS_NEURAL" \
         --vector mp --num-workers "$WORKERS" --device "$DEV" --tui --log-every 100 --seed "$SEED" \
         --ensembles $(echo $NEURAL_ENSEMBLES | awk '{print $1}') --hidden "$NEURAL_HIDDEN" --depth "$NEURAL_DEPTH" --dropout "$NEURAL_DROPOUT"
 
       run "neurallinear_f${NEURAL_FEATURES}" "$LOGDIR/neurallinear_f${NEURAL_FEATURES}.log" \
-        mab-gpu-puffer --env contextual --algo neurallinear --k "$K" --d "$D" --T "$T_NEURAL" --runs "$RUNS_NEURAL" \
+        puffer-bandits-native --env contextual --algo neurallinear --k "$K" --d "$D" --T "$T_NEURAL" --runs "$RUNS_NEURAL" \
         --vector mp --num-workers "$WORKERS" --device "$DEV" --tui --log-every 100 --seed "$SEED" \
         --features "$NEURAL_FEATURES" --linlam 1.0 --linv 0.1 --hidden "$NEURAL_HIDDEN" --depth "$NEURAL_DEPTH" --dropout "$NEURAL_DROPOUT"
     fi
@@ -141,28 +141,28 @@ for DEV in $DEVICES; do
     # --- Adversarial (plots + CSV, advanced runner) ---
     for G in $GAMMAS_EXP3; do
       run "exp3_g${G}" "$LOGDIR/exp3_g${G}.log" \
-        mab-gpu-advanced --env bernoulli --algo exp3 --k "$K" --T 1000 \
+        puffer-bandits-advanced --env bernoulli --algo exp3 --k "$K" --T 1000 \
         --runs "$RUNS_BASIC" --device "$DEV" --num-workers "$WORKERS" --log-every 200 --save-csv --seed "$SEED" --gamma "$G"
     done
     for G in $GAMMAS_EXP3IX; do
       run "exp3ix_g${G}" "$LOGDIR/exp3ix_g${G}.log" \
-        mab-gpu-advanced --env bernoulli --algo exp3ix --k "$K" --T 1000 \
+        puffer-bandits-advanced --env bernoulli --algo exp3ix --k "$K" --T 1000 \
         --runs "$RUNS_BASIC" --device "$DEV" --num-workers "$WORKERS" --log-every 200 --save-csv --seed "$SEED" --gamma "$G"
     done
 
     # --- Non-contextual with plots ---
     run "klucb_plots" "$LOGDIR/klucb_plots.log" \
-      mab-gpu-runner --algo klucb --k "$K" --T "$T_BASIC" --runs "$RUNS_BASIC" --device "$DEV" --num-workers "$WORKERS" --log-every 200 --save-csv --seed "$SEED"
+      puffer-bandits-runner --algo klucb --k "$K" --T "$T_BASIC" --runs "$RUNS_BASIC" --device "$DEV" --num-workers "$WORKERS" --log-every 200 --save-csv --seed "$SEED"
 
     for C in $DUCB_C; do for DIS in $DUCB_DISCOUNT; do
       run "ducb_c${C}_d${DIS}" "$LOGDIR/ducb_c${C}_d${DIS}.log" \
-        mab-gpu-runner --algo ducb --k "$K" --T 1500 --runs "$RUNS_BASIC" --device "$DEV" --num-workers "$WORKERS" --log-every 300 --save-csv --seed "$SEED" \
+        puffer-bandits-runner --algo ducb --k "$K" --T 1500 --runs "$RUNS_BASIC" --device "$DEV" --num-workers "$WORKERS" --log-every 300 --save-csv --seed "$SEED" \
         --nonstationary --sigma 0.1 --c "$C" --discount "$DIS"
     done; done
 
     for C in $SW_C; do for W in $SW_WINDOW; do
       run "swucb_c${C}_w${W}" "$LOGDIR/swucb_c${C}_w${W}.log" \
-        mab-gpu-runner --algo swucb --k "$K" --T 1500 --runs "$RUNS_BASIC" --device "$DEV" --num-workers "$WORKERS" --log-every 300 --save-csv --seed "$SEED" \
+        puffer-bandits-runner --algo swucb --k "$K" --T 1500 --runs "$RUNS_BASIC" --device "$DEV" --num-workers "$WORKERS" --log-every 300 --save-csv --seed "$SEED" \
         --nonstationary --sigma 0.1 --c "$C" --window "$W"
     done; done
 

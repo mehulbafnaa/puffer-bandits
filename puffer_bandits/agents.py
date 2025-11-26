@@ -200,3 +200,4 @@ class SlidingWindowUCB(Agent):
         # Update buffers
         self._act_buf[pos] = actions
         self._rew_buf[pos] = rewards
+

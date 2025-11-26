@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import torch
-from MAB_GPU.core.linear import sherman_morrison_update
+from puffer_bandits.core.linear import sherman_morrison_update
 
 
 def test_sherman_morrison_identity():
@@ -22,4 +22,3 @@ def test_sherman_morrison_identity():
     prod = torch.matmul(Ainv_new, A_new)
     err = (prod - I).abs().max().item()
     assert err < 1e-5
-

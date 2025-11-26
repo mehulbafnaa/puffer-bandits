@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import torch
-from MAB_GPU.core.adversarial import exp3_probs, exp3_update_factor, exp3ix_probs
+from ..core.adversarial import exp3_probs, exp3_update_factor, exp3ix_probs
 from .base import CtxAgent, CtxAgentCfg
 
 

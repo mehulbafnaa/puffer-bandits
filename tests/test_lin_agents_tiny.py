@@ -3,7 +3,7 @@ from __future__ import annotations
 import torch
 import numpy as np
 
-from MAB_GPU.agents_ctx import CtxAgentCfg, LinUCB, LinTS
+from puffer_bandits.agents_ctx import CtxAgentCfg, LinUCB, LinTS
 
 
 def test_linucb_scores_match_manual():

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import torch
-from MAB_GPU.advanced_agents import EXP3IX, CtxAgentCfg
+from puffer_bandits.advanced_agents import EXP3IX, CtxAgentCfg
 
 
 def test_exp3ix_update_changes_selected_only_and_probs_sum1():
@@ -32,4 +32,3 @@ def test_exp3ix_update_changes_selected_only_and_probs_sum1():
     # Probs after renormalization still sum to 1
     p2 = ag._probs()
     assert torch.allclose(p2.sum(dim=1), torch.ones(cfg.num_envs))
-

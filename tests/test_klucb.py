@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 
 import torch
-from MAB_GPU.core.bernoulli import kl_div_bernoulli, klucb_upper_bound
+from puffer_bandits.core.bernoulli import kl_div_bernoulli, klucb_upper_bound
 
 
 def test_klucb_feasible_and_monotone():
@@ -24,4 +24,3 @@ def test_klucb_feasible_and_monotone():
 
     # Upper confidence: u >= p_hat (monotone upwards)
     assert torch.all(u >= p_hat - 1e-7)
-

@@ -5,64 +5,64 @@ Conventions
 Device: replace --device mps with cpu or cuda as needed.
 Workers: keep --runs divisible by --num-workers (MP mode).
 Seeds: add --seed N to fix randomness.
-TUI: use native runner (mab-gpu-puffer) with --tui for in-terminal dashboards.
-Plots/CSV: use classic/advanced runners (mab-gpu-runner, mab-gpu-advanced) to save figures and CSVs.
+TUI: use native runner (puffer-bandits-native) with --tui for in-terminal dashboards.
+Plots/CSV: use classic/advanced runners (puffer-bandits-runner, puffer-bandits-advanced) to save figures and CSVs.
 Non‑Contextual (Bernoulli)
 
 Stationary (TUI, serial):
-uv run mab-gpu-puffer --env bernoulli --algo klucb --k 10 --T 600 --runs 512 --vector serial --device mps --tui --log-every 20
+uv run puffer-bandits-native --env bernoulli --algo klucb --k 10 --T 600 --runs 512 --vector serial --device mps --tui --log-every 20
 Stationary (TUI, MP throughput):
-uv run mab-gpu-puffer --env bernoulli --algo klucb --k 10 --T 2000 --runs 1024 --vector mp --num-workers 8 --device mps --tui --log-every 100
+uv run puffer-bandits-native --env bernoulli --algo klucb --k 10 --T 2000 --runs 1024 --vector mp --num-workers 8 --device mps --tui --log-every 100
 Non‑stationary (Discounted UCB, TUI):
-uv run mab-gpu-puffer --env bernoulli --algo ducb --k 10 --T 1000 --runs 512 --vector serial --device mps --tui --log-every 20 --nonstationary --sigma 0.1
-Non‑stationary (Sliding‑Window UCB, TUI):
-uv run mab-gpu-puffer --env bernoulli --algo swucb --k 10 --T 1000 --runs 512 --vector serial --device mps --tui --log-every 20
+uv run puffer-bandits-native --env bernoulli --algo ducb --k 10 --T 1000 --runs 512 --vector serial --device mps --tui --log-every 20 --nonstationary --sigma 0.1
+Non‑stationary S
+uv run puffer-bandits-native --env bernoulli --algo swucb --k 10 --T 1000 --runs 512 --vector serial --device mps --tui --log-every 20
 Contextual (Linear)
 
 LinUCB (TUI, serial):
-uv run mab-gpu-puffer --env contextual --algo linucb --k 10 --d 8 --T 600 --runs 256 --vector serial --device mps --tui --log-every 10 --alpha 1.0 --lam 1.0
+uv run puffer-bandits-native --env contextual --algo linucb --k 10 --d 8 --T 600 --runs 256 --vector serial --device mps --tui --log-every 10 --alpha 1.0 --lam 1.0
 LinTS (TUI, MP throughput):
-uv run mab-gpu-puffer --env contextual --algo lints --k 10 --d 8 --T 1000 --runs 1024 --vector mp --num-workers 8 --device mps --tui --log-every 50 --v 0.1 --lam 1.0
+uv run puffer-bandits-native --env contextual --algo lints --k 10 --d 8 --T 1000 --runs 1024 --vector mp --num-workers 8 --device mps --tui --log-every 50 --v 0.1 --lam 1.0
 Contextual (Neural)
 
 NeuralTS (TUI; reduce runs for speed):
-uv run mab-gpu-puffer --env contextual --algo neuralts --k 10 --d 8 --T 600 --runs 256 --vector mp --num-workers 8 --device mps --tui --log-every 50 --ensembles 3 --hidden 128 --depth 2 --dropout 0.1
+uv run puffer-bandits-native --env contextual --algo neuralts --k 10 --d 8 --T 600 --runs 256 --vector mp --num-workers 8 --device mps --tui --log-every 50 --ensembles 3 --hidden 128 --depth 2 --dropout 0.1
 NeuralLinearTS (TUI; modest feature dim):
-uv run mab-gpu-puffer --env contextual --algo neurallinear --k 10 --d 8 --T 600 --runs 256 --vector mp --num-workers 8 --device mps --tui --log-every 50 --features 32 --linlam 1.0 --linv 0.1
+uv run puffer-bandits-native --env contextual --algo neurallinear --k 10 --d 8 --T 600 --runs 256 --vector mp --num-workers 8 --device mps --tui --log-every 50 --features 32 --linlam 1.0 --linv 0.1
 Adversarial‑style (Bernoulli)
 
 EXP3 (vectorized with plots/CSV):
-uv run mab-gpu-advanced --env bernoulli --algo exp3 --k 10 --T 1000 --runs 1024 --device mps --num-workers 8 --log-every 200 --save-csv
+uv run puffer-bandits-advanced --env bernoulli --algo exp3 --k 10 --T 1000 --runs 1024 --device mps --num-workers 8 --log-every 200 --save-csv
 EXP3‑IX (vectorized with plots/CSV):
-uv run mab-gpu-advanced --env bernoulli --algo exp3ix --k 10 --T 1000 --runs 1024 --device mps --num-workers 8 --log-every 200 --save-csv
+uv run puffer-bandits-advanced --env bernoulli --algo exp3ix --k 10 --T 1000 --runs 1024 --device mps --num-workers 8 --log-every 200 --save-csv
 Classic “Plotting” Runs (Figures + CSVs)
 
 Bernoulli KL‑UCB:
-uv run mab-gpu-runner --algo klucb --k 10 --T 2000 --runs 1024 --device mps --num-workers 8 --log-every 200 --save-csv
+uv run puffer-bandits-runner --algo klucb --k 10 --T 2000 --runs 1024 --device mps --num-workers 8 --log-every 200 --save-csv
 Contextual LinUCB:
-uv run mab-gpu-advanced --env contextual --algo linucb --k 10 --d 8 --T 1000 --runs 1024 --device mps --num-workers 8 --log-every 200 --save-csv
+uv run puffer-bandits-advanced --env contextual --algo linucb --k 10 --d 8 --T 1000 --runs 1024 --device mps --num-workers 8 --log-every 200 --save-csv
 Contextual LinTS (with v,lam annotations):
-uv run mab-gpu-advanced --env contextual --algo lints --k 10 --d 8 --T 1000 --runs 1024 --device mps --num-workers 8 --log-every 200 --save-csv
+uv run puffer-bandits-advanced --env contextual --algo lints --k 10 --d 8 --T 1000 --runs 1024 --device mps --num-workers 8 --log-every 200 --save-csv
 Profiling / Performance
 
 Non‑contextual (profile prints):
-uv run mab-gpu-runner --algo klucb --k 10 --T 2000 --runs 1024 --device mps --num-workers 8 --profile --log-every 200
+uv run puffer-bandits-runner --algo klucb --k 10 --T 2000 --runs 1024 --device mps --num-workers 8 --profile --log-every 200
 Advanced contextual (profile prints, LinUCB):
-uv run mab-gpu-advanced --env contextual --algo linucb --k 10 --d 8 --T 1000 --runs 1024 --device mps --num-workers 8 --profile --log-every 200
+uv run puffer-bandits-advanced --env contextual --algo linucb --k 10 --d 8 --T 1000 --runs 1024 --device mps --num-workers 8 --profile --log-every 200
 Native TUI (serial; speed/steps/sec in TUI):
-uv run mab-gpu-puffer --env contextual --algo linucb --k 10 --d 8 --T 600 --runs 256 --vector serial --device mps --tui --log-every 10
+uv run puffer-bandits-native --env contextual --algo linucb --k 10 --d 8 --T 600 --runs 256 --vector serial --device mps --tui --log-every 10
 Smoke / CI‑friendly
 
 Minimal serial sanity checks:
-uv run mab-gpu-puffer --env bernoulli --algo klucb --k 5 --T 50 --runs 16 --vector serial --device cpu --tui --log-every 10
-uv run mab-gpu-puffer --env contextual --algo linucb --k 5 --d 3 --T 50 --runs 16 --vector serial --device cpu --tui --log-every 10
+uv run puffer-bandits-native --env bernoulli --algo klucb --k 5 --T 50 --runs 16 --vector serial --device cpu --tui --log-every 10
+uv run puffer-bandits-native --env contextual --algo linucb --k 5 --d 3 --T 50 --runs 16 --vector serial --device cpu --tui --log-every 10
 Sweeps & Plots (batch)
 
 All‑in sweep script (already added):
 bash scripts/run_all.sh mps
 Plot a sweep:
-uv run python MAB_GPU/plot_sweeps.py --file plots_gpu/summary.csv --algo klucb --param c --out plots_gpu/sweep_klucb_c.png
-uv run python MAB_GPU/plot_sweeps.py --file plots_gpu/advanced_summary.csv --algo linucb --param alpha --out plots_gpu/sweep_linucb_alpha.png
+uv run python puffer_bandits/plot_sweeps.py --file plots_gpu/summary.csv --algo klucb --param c --out plots_gpu/sweep_klucb_c.png
+uv run python puffer_bandits/plot_sweeps.py --file plots_gpu/advanced_summary.csv --algo linucb --param alpha --out plots_gpu/sweep_linucb_alpha.png
 Hyperparameter Ranges (guidance)
 
 KLUCB: alpha ~ 1.0–3.0

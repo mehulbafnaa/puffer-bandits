@@ -3,7 +3,7 @@ from __future__ import annotations
 import numpy as np
 import torch
 
-import MAB_GPU.runner_puffer_native as rpn
+import puffer_bandits.runner_puffer_native as rpn
 
 
 def test_native_runner_smoke_bernoulli_serial():
@@ -39,4 +39,3 @@ def test_native_runner_smoke_contextual_serial():
         agent.update(actions, rewards, obs_t)
         obs = next_obs
     vec.close()
-

@@ -15,7 +15,7 @@ CORES = os.cpu_count() or 1
 from pufferlib.emulation import GymnasiumPufferEnv
 from pufferlib.vector import Multiprocessing
 
-from MAB_GPU.agents_ctx import (
+from .agents_ctx import (
     EXP3,
     EXP3IX,
     CtxAgentCfg,
@@ -24,10 +24,10 @@ from MAB_GPU.agents_ctx import (
     NeuralLinearTS,
     NeuralTS,
 )
-from MAB_GPU.agents_ctx import pick_device
-from MAB_GPU.bandit_env import BernoulliBanditEnv
-from MAB_GPU.contextual_env import ContextualBanditEnv
-from MAB_GPU.utils.device import memory_stats, sync_device
+from .agents_ctx import pick_device
+from .bandit_env import BernoulliBanditEnv
+from .contextual_env import ContextualBanditEnv
+from .utils.device import memory_stats, sync_device
 try:
     import matplotlib.pyplot as plt  # optional plotting
 except Exception:
@@ -79,7 +79,7 @@ class Config:
 
 
 def parse_args() -> Config:
-    p = argparse.ArgumentParser("Advanced GPU MAB (contextual/adversarial) with PufferLib")
+    p = argparse.ArgumentParser("Advanced contextual/adversarial bandits (PufferLib)")
     p.add_argument("--algo", type=str, choices=["linucb", "lints", "exp3", "exp3ix", "neuralts", "neurallinear"], default="linucb")
     p.add_argument("--env", type=str, choices=["contextual", "bernoulli"], default="contextual")
     p.add_argument("--k", type=int, default=10)
@@ -234,13 +234,11 @@ def main() -> None:
         if cfg.profile:
             sync_device(device)
             t0 = time.perf_counter()
-            if obs_host is not None:
-                obs_t = obs_buf
-                obs_t.copy_(torch.from_numpy(obs_host).to(device=device, dtype=torch.float32))
+            if cfg.env == "contextual":
+                obs_buf.copy_(torch.from_numpy(obs_host).to(device=device, dtype=torch.float32))
+                actions = agent.select_actions(t, obs_buf)
             else:
-                obs_t = obs_buf
-                obs_t.zero_()
-            actions = agent.select_actions(t, obs_t)
+                actions = agent.select_actions(t)
             sync_device(device)
             prof["select"] += time.perf_counter() - t0
 
@@ -249,80 +247,40 @@ def main() -> None:
             prof["actions_to_cpu"] += time.perf_counter() - t0
 
             t0 = time.perf_counter()
-            next_obs, r, _, _, infos = vec.step(atn_np)
+            obs, r, _, _, infos = vec.step(atn_np)
             prof["env_step"] += time.perf_counter() - t0
 
             t0 = time.perf_counter()
-            rewards = rewards_t
-            rewards.copy_(torch.from_numpy(r.astype(np.float32)).to(device=device))
+            rewards_t.copy_(torch.from_numpy(r.astype(np.float32)).to(device=device))
             sync_device(device)
             prof["rewards_to_device"] += time.perf_counter() - t0
 
             t0 = time.perf_counter()
-            agent.update(actions, rewards, obs_t)
+            if cfg.env == "contextual":
+                agent.update(actions, rewards_t, obs_buf)
+            else:
+                agent.update(actions, rewards_t)
             sync_device(device)
             prof["update"] += time.perf_counter() - t0
         else:
-            if obs_host is not None:
-                obs_t = obs_buf
-                obs_t.copy_(torch.from_numpy(obs_host).to(device=device, dtype=torch.float32))
+            if cfg.env == "contextual":
+                obs_t = torch.from_numpy(obs).to(device=device, dtype=torch.float32)
+                actions = agent.select_actions(t, obs_t)
             else:
-                obs_t = obs_buf
-                obs_t.zero_()
-            actions = agent.select_actions(t, obs_t)
+                actions = agent.select_actions(t)
             atn_np = actions.detach().cpu().numpy()
-            next_obs, r, _, _, infos = vec.step(atn_np)
-            rewards = rewards_t
-            rewards.copy_(torch.from_numpy(r.astype(np.float32)).to(device=device))
-            agent.update(actions, rewards, obs_t)
-
-        # Metrics and bookkeeping
-        cumulative_reward += r.astype(float)
-        if isinstance(infos, list) and infos:
-            opt_flags = np.array([int(i.get("optimal", 0)) for i in infos], dtype=float)
-            pstars = np.array([float(np.nanmax(i.get("p", [np.nan]))) for i in infos], dtype=float)
-        else:
-            opt_flags = np.zeros(n, dtype=float)
-            pstars = np.full(n, np.nan, dtype=float)
-
-        if not have_pstar0:
-            pstar0 = np.where(np.isnan(pstars), pstar0, pstars)
-            have_pstar0 = True
-
-        if cfg.nonstationary or cfg.env == "contextual":
-            cumulative_pstar += np.nan_to_num(pstars, nan=0.0)
-
-        # Reward CI
-        m = float(r.mean())
-        se = float(r.std(ddof=1) / np.sqrt(n)) if n > 1 else 0.0
-        mean_reward[t - 1] = m
-        reward_lo[t - 1] = m - 1.96 * se
-        reward_hi[t - 1] = m + 1.96 * se
-
-        # % optimal CI
-        pct = float(opt_flags.mean() * 100.0)
-        pct_se = float(opt_flags.std(ddof=1) / np.sqrt(n) * 100.0) if n > 1 else 0.0
-        pct_opt[t - 1] = pct
-        pct_opt_lo[t - 1] = pct - 1.96 * pct_se
-        pct_opt_hi[t - 1] = pct + 1.96 * pct_se
-
-        # Regret CI
-        if cfg.nonstationary or cfg.env == "contextual":
-            regrets = cumulative_pstar - cumulative_reward
-        else:
-            regrets = pstar0 * t - cumulative_reward
-        rg_m = float(regrets.mean())
-        rg_se = float(regrets.std(ddof=1) / np.sqrt(n)) if n > 1 else 0.0
-        cumulative_regret[t - 1] = rg_m
-        cumulative_regret_lo[t - 1] = rg_m - 1.96 * rg_se
-        cumulative_regret_hi[t - 1] = rg_m + 1.96 * rg_se
+            obs, r, _, _, infos = vec.step(atn_np)
+            rewards = torch.from_numpy(r.astype(np.float32)).to(device=device)
+            if cfg.env == "contextual":
+                agent.update(actions, rewards, obs_t)
+            else:
+                agent.update(actions, rewards)
 
         if t % cfg.log_every == 0:
-            print(f"t={t} mean_reward={m:.4f} %optimal={pct:.2f} regret={rg_m:.4f}")
+            print(f"t={t} mean_reward={float(np.mean(r)):.4f}")
             if cfg.profile:
                 steps_done = t
                 ms = {k: 1000.0 * v / steps_done for k, v in prof.items()}
-                mem = memory_stats(device)
                 print(
                     "profile(ms/step):",
                     f"select={ms['select']:.3f}",
@@ -330,73 +288,13 @@ def main() -> None:
                     f"step={ms['env_step']:.3f}",
                     f"r2dev={ms['rewards_to_device']:.3f}",
                     f"update={ms['update']:.3f}",
-                    "mem=", mem,
                 )
-
-        # Advance obs
-        obs = next_obs
 
     vec.close()
 
-    # Save plots
-    if plt is not None:
-        os.makedirs(cfg.outdir, exist_ok=True)
-        def tag() -> str:
-            parts = [f"algo={cfg.algo}", f"env={cfg.env}", f"k={cfg.k}", f"d={cfg.d}", f"T={cfg.T}", f"runs={cfg.runs}"]
-            if cfg.algo == "linucb":
-                parts += [f"alpha={cfg.alpha}", f"lam={cfg.lam}"]
-            if cfg.algo == "lints":
-                parts += [f"v={cfg.v}", f"lam={cfg.lam}"]
-            if cfg.algo == "exp3":
-                parts += [f"gamma={cfg.gamma}"]
-            return "_".join(parts)
-        x = np.arange(1, T + 1)
-        plt.figure(figsize=(6,4))
-        plt.plot(x, mean_reward, label="mean reward")
-        plt.fill_between(x, reward_lo, reward_hi, alpha=0.2, label="95% CI")
-        plt.xlabel("t"); plt.ylabel("Mean reward"); plt.legend(); plt.tight_layout()
-        plt.savefig(os.path.join(cfg.outdir, f"adv_reward_{tag()}.png")); plt.close()
-
-        plt.figure(figsize=(6,4))
-        plt.plot(x, pct_opt, label="% optimal")
-        plt.fill_between(x, pct_opt_lo, pct_opt_hi, alpha=0.2, label="95% CI")
-        plt.xlabel("t"); plt.ylabel("% optimal"); plt.legend(); plt.tight_layout()
-        plt.savefig(os.path.join(cfg.outdir, f"adv_pct_optimal_{tag()}.png")); plt.close()
-
-        plt.figure(figsize=(6,4))
-        plt.plot(x, cumulative_regret, label="cumulative regret")
-        plt.fill_between(x, cumulative_regret_lo, cumulative_regret_hi, alpha=0.2, label="95% CI")
-        plt.xlabel("t"); plt.ylabel("Cumulative regret"); plt.legend(); plt.tight_layout()
-        plt.savefig(os.path.join(cfg.outdir, f"adv_regret_{tag()}.png")); plt.close()
-    else:
-        print("Warning: matplotlib not available; skipping plots")
-
-    if cfg.save_csv:
-        os.makedirs(cfg.outdir, exist_ok=True)
-        path = os.path.join(cfg.outdir, "advanced_summary.csv")
-        with open(path, "a", newline="") as f:
-            w = csv.writer(f)
-            if f.tell() == 0:
-                w.writerow(["algo","env","k","d","T","runs","seed","alpha","lam","v","gamma","final_mean_reward","final_%_optimal","final_cumulative_regret"])
-            w.writerow([
-                cfg.algo, cfg.env, cfg.k, cfg.d, T, cfg.runs, cfg.seed, cfg.alpha, cfg.lam, cfg.v, cfg.gamma,
-                float(mean_reward[-1]), float(pct_opt[-1]), float(cumulative_regret[-1])
-            ])
-
-    print(f"Mean reward (first 5): {np.round(mean_reward[:5], 3)}")
-    print(f"% optimal (first 5): {np.round(pct_opt[:5], 1)}")
-    if cfg.profile:
-        ms = {k: 1000.0 * v / T for k, v in prof.items()}
-        mem = memory_stats(device)
-        print(
-            "Final profile(ms/step):",
-            f"select={ms['select']:.3f}",
-            f"a2cpu={ms['actions_to_cpu']:.3f}",
-            f"step={ms['env_step']:.3f}",
-            f"r2dev={ms['rewards_to_device']:.3f}",
-            f"update={ms['update']:.3f}",
-            "mem=", mem,
-        )
+    # Optionally print memory stats at end
+    if cfg.debug_devices:
+        print(memory_stats())
 
 
 if __name__ == "__main__":

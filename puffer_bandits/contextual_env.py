@@ -137,3 +137,4 @@ class ContextualBanditEnv(BaseEnv):
         plt.title("Contextual Bandit (current step probabilities)")
         plt.pause(0.001)
         return None
+

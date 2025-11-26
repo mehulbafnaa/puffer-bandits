@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import torch
-from MAB_GPU.core.nonstationary import discounted_ucb_update, sw_add_remove
+from puffer_bandits.core.nonstationary import discounted_ucb_update, sw_add_remove
 
 
 def test_sliding_window_sentinel_noop():
@@ -37,4 +37,3 @@ def test_discounted_ucb_update_shapes_and_values():
     assert torch.allclose(N2[0, 0], torch.tensor(1.0))
     assert torch.all(S2[0, 1:] == 0)
     assert torch.all(N2[0, 1:] == 0)
-

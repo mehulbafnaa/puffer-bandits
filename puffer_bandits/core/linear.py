@@ -19,3 +19,4 @@ def sherman_morrison_update(A_inv: torch.Tensor, x: torch.Tensor) -> torch.Tenso
     # Outer product over the feature dim: (..., d, 1) @ (..., 1, d) -> (..., d, d)
     outer = torch.matmul(Ainv_x.unsqueeze(-1), Ainv_x.unsqueeze(-2))
     return A_inv - outer / denom.unsqueeze(-1)
+
