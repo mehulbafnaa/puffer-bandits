@@ -18,7 +18,7 @@ Elegant, scalable bandit research toolkit built on PufferLib and uv. Environment
 - Repro‑friendly: uv CLIs, seeds, scripted sweeps
 
 ## Install
-- Requirements: Python 3.9+, `uv` (`pipx install uv`)
+- Requirements: Python 3.12+, `uv` (`pipx install uv`)
 - Create an environment and install dependencies:
   - `uv venv && uv sync`
 - Install PyTorch (choose one):
