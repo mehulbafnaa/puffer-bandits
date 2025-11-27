@@ -103,6 +103,13 @@ class Config:
     x_key: str = "X"
     p_key: str = "P"
     y_key: str = "Y"
+    # Logging (optional)
+    wandb: bool = False
+    wandb_project: str | None = None
+    wandb_entity: str | None = None
+    wandb_tags: str | None = None
+    wandb_offline: bool = False
+    run_name: str | None = None
 
 
 def parse_args() -> Config:
@@ -148,6 +155,13 @@ def parse_args() -> Config:
     p.add_argument("--x-key", type=str, default="X")
     p.add_argument("--p-key", type=str, default="P")
     p.add_argument("--y-key", type=str, default="Y")
+    # Weights & Biases (optional)
+    p.add_argument("--wandb", action="store_true", help="Log metrics to Weights & Biases")
+    p.add_argument("--wandb-project", type=str, default=None)
+    p.add_argument("--wandb-entity", type=str, default=None)
+    p.add_argument("--wandb-tags", type=str, default=None, help=",-separated tags")
+    p.add_argument("--wandb-offline", action="store_true")
+    p.add_argument("--run-name", type=str, default=None)
     args = p.parse_args()
     
     # Apply preset defaults first, then CLI overrides
@@ -169,7 +183,8 @@ def parse_args() -> Config:
         "data_path": args.data_path, "x_key": args.x_key, "p_key": args.p_key, "y_key": args.y_key,
     })
 
-    return Config(**config_dict)
+    cfg = Config(**config_dict)
+    return cfg
 
 
 def build_envs(cfg: Config):
@@ -264,6 +279,39 @@ def main() -> None:
     cum_regret_total = 0.0
     ewma_ms: float | None = None
 
+    # Optional Weights & Biases
+    wb = None
+    if cfg.wandb:
+        try:
+            import os as _os
+            import wandb as _wandb  # type: ignore
+            if cfg.wandb_offline:
+                _os.environ.setdefault("WANDB_MODE", "offline")
+            run_name = cfg.run_name or f"native-{cfg.env}-{cfg.algo}-k{cfg.k}-d{cfg.d}-n{cfg.runs}-{device}-{cfg.seed}"
+            wb_cfg = {
+                "runner": "native",
+                "env": cfg.env,
+                "algo": cfg.algo,
+                "k": cfg.k,
+                "d": cfg.d,
+                "T": cfg.T,
+                "runs": cfg.runs,
+                "device": str(device),
+                "seed": cfg.seed,
+                "vector": cfg.vector,
+                "num_workers": cfg.num_workers,
+            }
+            wb = _wandb.init(
+                project=cfg.wandb_project or "puffer-bandits",
+                entity=cfg.wandb_entity,
+                name=run_name,
+                config=wb_cfg,
+                tags=[t.strip() for t in (cfg.wandb_tags or "").split(",") if t.strip()],
+                reinit=True,
+            )
+        except Exception:
+            wb = None
+
     for t in range(1, T + 1):
         if cfg.env == "contextual":
             if isinstance(obs, np.ndarray):
@@ -334,11 +382,30 @@ def main() -> None:
                 )
             except Exception:
                 pass
+        if wb is not None and (t % cfg.log_every == 0):
+            try:
+                import wandb as _wandb  # type: ignore
+                _wandb.log({
+                    "t": t,
+                    "mean_reward": float(np.mean(r)),
+                    "%_optimal": pct_opt,
+                    "cumulative_regret": float(cum_regret_total),
+                    "last_ms": last_ms,
+                    "ewma_ms": ewma_ms,
+                }, step=t)
+            except Exception:
+                pass
 
     vec.close()
     if tui is not None:
         try:
             tui.stop()
+        except Exception:
+            pass
+    if wb is not None:
+        try:
+            import wandb as _wandb  # type: ignore
+            _wandb.finish()
         except Exception:
             pass
 

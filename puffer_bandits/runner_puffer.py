@@ -55,6 +55,13 @@ class Config:
     save_csv: bool = False
     debug_devices: bool = False
     profile: bool = False
+    # Logging (optional)
+    wandb: bool = False
+    wandb_project: str | None = None
+    wandb_entity: str | None = None
+    wandb_tags: str | None = None
+    wandb_offline: bool = False
+    run_name: str | None = None
 
 
 def parse_args() -> Config:
@@ -83,6 +90,13 @@ def parse_args() -> Config:
     p.add_argument("--save-csv", action="store_true")
     p.add_argument("--debug-devices", action="store_true")
     p.add_argument("--profile", action="store_true", help="print per-step timing breakdowns")
+    # Weights & Biases (optional)
+    p.add_argument("--wandb", action="store_true", help="Log metrics to Weights & Biases")
+    p.add_argument("--wandb-project", type=str, default=None)
+    p.add_argument("--wandb-entity", type=str, default=None)
+    p.add_argument("--wandb-tags", type=str, default=None, help=",-separated tags")
+    p.add_argument("--wandb-offline", action="store_true")
+    p.add_argument("--run-name", type=str, default=None)
     # Backward-compatible aliases
     p.add_argument("--agent", type=str, choices=["klucb", "ducb", "swucb"], default=None)
     p.add_argument("--num-envs", type=int, default=None)
@@ -110,6 +124,12 @@ def parse_args() -> Config:
         save_csv=bool(args.save_csv),
         debug_devices=bool(args.debug_devices),
         profile=bool(args.profile),
+        wandb=bool(args.wandb),
+        wandb_project=args.wandb_project,
+        wandb_entity=args.wandb_entity,
+        wandb_tags=args.wandb_tags,
+        wandb_offline=bool(args.wandb_offline),
+        run_name=args.run_name,
     )
 
 
@@ -210,6 +230,38 @@ def main() -> None:
             except Exception:
                 pass
 
+    # Optional Weights & Biases
+    wb = None
+    if cfg.wandb:
+        try:
+            import os as _os
+            import wandb as _wandb  # type: ignore
+            if cfg.wandb_offline:
+                _os.environ.setdefault("WANDB_MODE", "offline")
+            run_name = cfg.run_name or f"classic-{cfg.algo}-k{cfg.k}-T{cfg.T}-n{cfg.runs}-{device}-{cfg.seed}"
+            wb_cfg = {
+                "runner": "classic",
+                "algo": cfg.algo,
+                "k": cfg.k,
+                "T": cfg.T,
+                "runs": cfg.runs,
+                "device": str(device),
+                "seed": cfg.seed,
+                "nonstationary": cfg.nonstationary,
+                "sigma": cfg.sigma,
+                "outdir": cfg.outdir,
+            }
+            wb = _wandb.init(
+                project=cfg.wandb_project or "puffer-bandits",
+                entity=cfg.wandb_entity,
+                name=run_name,
+                config=wb_cfg,
+                tags=[t.strip() for t in (cfg.wandb_tags or "").split(",") if t.strip()],
+                reinit=True,
+            )
+        except Exception:
+            wb = None
+
     for t in range(1, T + 1):
         if cfg.profile:
             _sync()
@@ -295,6 +347,17 @@ def main() -> None:
 
         if t % cfg.log_every == 0:
             print(f"t={t} mean_reward={m:.4f} %optimal={pct:.2f} regret={rg_m:.4f}")
+            if wb is not None:
+                try:
+                    import wandb as _wandb  # type: ignore
+                    _wandb.log({
+                        "t": t,
+                        "mean_reward": m,
+                        "%_optimal": pct,
+                        "cumulative_regret": rg_m,
+                    }, step=t)
+                except Exception:
+                    pass
             if cfg.profile:
                 steps_done = t
                 ms = {k: 1000.0 * v / steps_done for k, v in prof.items()}
@@ -366,6 +429,12 @@ def main() -> None:
 
     print(f"Mean reward (first 5): {np.round(mean_reward[:5], 3)}")
     print(f"% optimal (first 5): {np.round(pct_opt[:5], 1)}")
+    if wb is not None:
+        try:
+            import wandb as _wandb  # type: ignore
+            _wandb.finish()
+        except Exception:
+            pass
     if cfg.profile:
         ms = {k: 1000.0 * v / T for k, v in prof.items()}
         print(

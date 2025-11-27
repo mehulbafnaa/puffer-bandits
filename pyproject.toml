@@ -7,7 +7,7 @@ name = "puffer-bandits"
 version = "0.1.0"
 description = "GPU-enabled Multi-Armed Bandits using PufferLib and PyTorch"
 readme = "README.md"
-requires-python = ">=3.9"
+requires-python = ">=3.12"
 authors = [{ name = "Mehul" }]
 dependencies = [
   "numpy>=1.24",
@@ -20,6 +20,9 @@ dependencies = [
 [project.optional-dependencies]
 test = [
   "pytest>=7",
+]
+wandb = [
+  "wandb>=0.16",
 ]
 
 [project.scripts]
@@ -43,7 +46,7 @@ package-dir = {"puffer_bandits" = "puffer_bandits"}
 # pufferlib = { path = "../PufferLib" }
 
 [tool.ruff]
-target-version = "py310"
+target-version = "py312"
 line-length = 100
 exclude = ["**/.jj/**", "**/.git/**", "**/.venv/**"]
 
@@ -52,7 +55,7 @@ select = ["E", "F", "I", "UP"]
 ignore = []
 
 [tool.mypy]
-python_version = "3.10"
+python_version = "3.12"
 ignore_missing_imports = true  # torch, gym may not have stubs
 warn_unused_configs = true
 disallow_untyped_defs = false

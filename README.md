@@ -61,6 +61,16 @@ Elegant, scalable bandit research toolkit built on PufferLib and uv. Environment
 - Knobs: `DO_SMOKE=1|0 DO_THROUGHPUT=1|0 DO_NEURAL=1|0 WORKERS K D` and per‑algo ranges (`ALPHAS`, `VS`, `GAMMAS_*`, `SW_WINDOW`, etc.)
 - Logs under `sweeps_logs/`; CSV/plots saved in `plots_gpu/` when enabled
 
+## Logging to Weights & Biases (optional)
+- Enable with `--wandb` on any runner. Recommended extras:
+  - `--wandb-project puffer-bandits` `--wandb-tags mps,linucb` `--run-name my-run`
+  - Offline mode: `--wandb-offline` (or set `WANDB_MODE=offline`)
+- Examples:
+  - Native: `uv run puffer-bandits-native --env contextual --algo linucb ... --wandb --wandb-project puffer-bandits`
+  - Advanced: `uv run puffer-bandits-advanced --env bernoulli --algo exp3 ... --wandb`
+  - Classic: `uv run puffer-bandits-runner --algo klucb ... --wandb --save-csv`
+- Metrics logged per `--log-every`: mean_reward, %_optimal (when available), cumulative_regret, and simple perf stats.
+
 ## Tips
 - Target the project venv: `uv run --active …`
 - Ensure `--runs` is divisible by `--num-workers` (or set `--num-workers 1`)

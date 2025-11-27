@@ -76,6 +76,13 @@ class Config:
     save_csv: bool = False
     debug_devices: bool = False
     profile: bool = False
+    # Logging (optional)
+    wandb: bool = False
+    wandb_project: str | None = None
+    wandb_entity: str | None = None
+    wandb_tags: str | None = None
+    wandb_offline: bool = False
+    run_name: str | None = None
 
 
 def parse_args() -> Config:
@@ -118,6 +125,13 @@ def parse_args() -> Config:
     p.add_argument("--force-device", action="store_true")
     p.add_argument("--no-amp", action="store_false", dest="amp")
     p.add_argument("--compile", action="store_true")
+    # Weights & Biases (optional)
+    p.add_argument("--wandb", action="store_true", help="Log metrics to Weights & Biases")
+    p.add_argument("--wandb-project", type=str, default=None)
+    p.add_argument("--wandb-entity", type=str, default=None)
+    p.add_argument("--wandb-tags", type=str, default=None, help=",-separated tags")
+    p.add_argument("--wandb-offline", action="store_true")
+    p.add_argument("--run-name", type=str, default=None)
     args = p.parse_args()
     return Config(
         algo=args.algo, env=args.env, k=args.k, d=args.d, T=args.T, runs=args.runs, seed=args.seed,
@@ -127,6 +141,7 @@ def parse_args() -> Config:
         features=args.features, linlam=args.linlam, linv=args.linv,
         num_workers=args.num_workers, batch_size=args.batch_size, device=args.device, log_every=args.log_every, force_device=bool(args.force_device), amp=bool(args.amp), compile=bool(args.compile),
         outdir=args.outdir, save_csv=bool(args.save_csv), debug_devices=bool(args.debug_devices), profile=bool(args.profile),
+        wandb=bool(args.wandb), wandb_project=args.wandb_project, wandb_entity=args.wandb_entity, wandb_tags=args.wandb_tags, wandb_offline=bool(args.wandb_offline), run_name=args.run_name,
     )
 
 
@@ -224,6 +239,37 @@ def main() -> None:
     rewards_t = torch.empty((n,), device=device, dtype=torch.float32)
     obs_buf = torch.empty((n, cfg.k, max(1, cfg.d)), device=device, dtype=torch.float32)
 
+    # Optional Weights & Biases
+    wb = None
+    if cfg.wandb:
+        try:
+            import os as _os
+            import wandb as _wandb  # type: ignore
+            if cfg.wandb_offline:
+                _os.environ.setdefault("WANDB_MODE", "offline")
+            run_name = cfg.run_name or f"advanced-{cfg.env}-{cfg.algo}-k{cfg.k}-d{cfg.d}-n{cfg.runs}-{device}-{cfg.seed}"
+            wb_cfg = {
+                "runner": "advanced",
+                "env": cfg.env,
+                "algo": cfg.algo,
+                "k": cfg.k,
+                "d": cfg.d,
+                "T": cfg.T,
+                "runs": cfg.runs,
+                "device": str(device),
+                "seed": cfg.seed,
+            }
+            wb = _wandb.init(
+                project=cfg.wandb_project or "puffer-bandits",
+                entity=cfg.wandb_entity,
+                name=run_name,
+                config=wb_cfg,
+                tags=[t.strip() for t in (cfg.wandb_tags or "").split(",") if t.strip()],
+                reinit=True,
+            )
+        except Exception:
+            wb = None
+
     for t in range(1, T + 1):
         # Prepare obs for agent (if required). EXP3 ignores obs.
         if cfg.env == "contextual":
@@ -277,7 +323,17 @@ def main() -> None:
                 agent.update(actions, rewards)
 
         if t % cfg.log_every == 0:
-            print(f"t={t} mean_reward={float(np.mean(r)):.4f}")
+            mean_r = float(np.mean(r))
+            print(f"t={t} mean_reward={mean_r:.4f}")
+            if wb is not None:
+                try:
+                    import wandb as _wandb  # type: ignore
+                    _wandb.log({
+                        "t": t,
+                        "mean_reward": mean_r,
+                    }, step=t)
+                except Exception:
+                    pass
             if cfg.profile:
                 steps_done = t
                 ms = {k: 1000.0 * v / steps_done for k, v in prof.items()}
@@ -295,6 +351,12 @@ def main() -> None:
     # Optionally print memory stats at end
     if cfg.debug_devices:
         print(memory_stats())
+    if wb is not None:
+        try:
+            import wandb as _wandb  # type: ignore
+            _wandb.finish()
+        except Exception:
+            pass
 
 
 if __name__ == "__main__":
