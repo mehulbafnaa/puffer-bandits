@@ -22,7 +22,7 @@ from .agents import (
     SlidingWindowUCB,
 )
 from .bandit_env import BernoulliBanditEnv
-from .utils.device import pick_device, memory_stats
+from .utils.device import pick_device
 try:
     import matplotlib.pyplot as plt  # optional plotting
 except Exception:
@@ -55,7 +55,6 @@ class Config:
     save_csv: bool = False
     debug_devices: bool = False
     profile: bool = False
-    tui: bool = False
     # Logging (optional)
     wandb: bool = False
     wandb_project: str | None = None
@@ -91,7 +90,6 @@ def parse_args() -> Config:
     p.add_argument("--save-csv", action="store_true")
     p.add_argument("--debug-devices", action="store_true")
     p.add_argument("--profile", action="store_true", help="print per-step timing breakdowns")
-    p.add_argument("--tui", action="store_true", help="Rich TUI console dashboard (no matplotlib)")
     # Weights & Biases (optional)
     p.add_argument("--wandb", action="store_true", help="Log metrics to Weights & Biases")
     p.add_argument("--wandb-project", type=str, default=None)
@@ -130,9 +128,6 @@ def parse_args() -> Config:
                 conf[key] = val
         elif val is not None:
             conf[key] = val
-
-    # Enforce: TUI is CLI-only (ignore config file value)
-    conf["tui"] = bool(getattr(args, "tui", False))
 
     cfg_dict = OmegaConf.to_container(conf, resolve=True)  # type: ignore
     return Config(**cfg_dict)  # type: ignore[arg-type]
@@ -272,20 +267,6 @@ def run_with_config(cfg: Config) -> None:
         config=wb_cfg,
     )
 
-    # Optional TUI accumulators
-    tui = None
-    if cfg.tui:
-        try:
-            from .ui.tui import RichTUI  # type: ignore
-            tui = RichTUI(cfg.k, cfg.T, f"{device}")
-        except Exception:
-            tui = None
-    cum_counts = np.zeros((cfg.k,), dtype=int)
-    cum_regret_by_arm = np.zeros((cfg.k,), dtype=float)
-    cum_regret_total = 0.0
-    ewma_ms: float | None = None
-    last_ms: float | None = None
-
     for t in range(1, T + 1):
         if cfg.profile:
             _sync()
@@ -312,17 +293,11 @@ def run_with_config(cfg: Config) -> None:
             _sync()
             prof["update"] += time.perf_counter() - t0
         else:
-            t0_np = time.perf_counter()
             actions = agent.select_actions(t)
             atn_np = actions.detach().cpu().numpy()
             _, r, _, _, infos = vec.step(atn_np)
             rewards = torch.from_numpy(r).to(device=device, dtype=torch.float32)
             agent.update(actions, rewards)
-            last_ms = (time.perf_counter() - t0_np) * 1000.0
-            if ewma_ms is None:
-                ewma_ms = last_ms
-            else:
-                ewma_ms = 0.9 * ewma_ms + 0.1 * last_ms
         if cfg.debug_devices and t == 1:
             # Show device flow at first step
             from .devices_debug import _desc  # type: ignore
@@ -390,45 +365,6 @@ def run_with_config(cfg: Config) -> None:
                     f"r2dev={ms['rewards_to_device']:.3f}",
                     f"update={ms['update']:.3f}",
                 )
-            if tui is not None:
-                # Per-step regret breakdown for TUI
-                regret_step = 0.0
-                if isinstance(infos, list) and infos:
-                    for i, inf in enumerate(infos):
-                        p_vec = inf.get("p") if isinstance(inf, dict) else None
-                        if p_vec is not None:
-                            try:
-                                pstar = float(np.max(p_vec))
-                                a_i = int(atn_np[i])
-                                p_sel = float(p_vec[a_i])
-                                r_i = max(0.0, pstar - p_sel)
-                                regret_step += r_i
-                                if 0 <= a_i < cfg.k:
-                                    cum_regret_by_arm[a_i] += r_i
-                            except Exception:
-                                pass
-                cum_regret_total += regret_step
-                cum_counts += np.bincount(atn_np, minlength=cfg.k)
-                try:
-                    mem = memory_stats(device)
-                    speed_sps = None if last_ms is None else (1000.0 / last_ms if last_ms > 0 else None)
-                    tui.update(
-                        t=t,
-                        mean_r=m,
-                        pct_opt=pct,
-                        regret=float(cum_regret_total),
-                        actions=atn_np.tolist(),
-                        mem=mem,
-                        values=None,
-                        speed_sps=speed_sps,
-                        cum_counts=cum_counts.tolist(),
-                        cum_regret_by_arm=cum_regret_by_arm.tolist(),
-                        last_ms=last_ms,
-                        ewma_ms=ewma_ms,
-                        values_labels=None,
-                    )
-                except Exception:
-                    pass
 
     vec.close()
 
@@ -513,11 +449,6 @@ def run_with_config(cfg: Config) -> None:
 
     print(f"Mean reward (first 5): {np.round(mean_reward[:5], 3)}")
     print(f"% optimal (first 5): {np.round(pct_opt[:5], 1)}")
-    if tui is not None:
-        try:
-            tui.stop()
-        except Exception:
-            pass
     if wb is not None:
         wb_finish(wb)
     if cfg.profile:
@@ -532,10 +463,6 @@ def run_with_config(cfg: Config) -> None:
         )
 
 
-def main() -> None:
+if __name__ == "__main__":
     cfg = parse_args()
     run_with_config(cfg)
-
-
-if __name__ == "__main__":
-    main()
