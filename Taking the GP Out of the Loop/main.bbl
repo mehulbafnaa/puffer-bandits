@@ -1,0 +1,150 @@
+\begin{thebibliography}{10}
+
+\bibitem{optuna}
+Takuya Akiba, Shotaro Sano, Toshihiko Yanase, Takeru Ohta, and Masanori Koyama.
+\newblock Optuna: A next-generation hyperparameter optimization framework.
+\newblock {\em Proceedings of the 25th ACM SIGKDD International Conference on Knowledge Discovery \& Data Mining}, 2019.
+
+\bibitem{simopt}
+Satyajith Amaran, Nikolaos~V. Sahinidis, Bikram Sharda, and Scott~J. Bury.
+\newblock Simulation optimization: {A} review of algorithms and applications.
+\newblock {\em CoRR}, abs/1706.08591, 2017.
+
+\bibitem{gym}
+Greg Brockman, Vicki Cheung, Ludwig Pettersson, Jonas Schneider, John Schulman, Jie Tang, and Wojciech Zaremba.
+\newblock Openai gym.
+\newblock {\em CoRR}, abs/1606.01540, 2016.
+
+\bibitem{cohen}
+William~G. Cochran.
+\newblock The combination of estimates from different experiments.
+\newblock {\em Biometrics}, 10(1):101--129, 1954.
+
+\bibitem{turbomoo}
+Samuel Daulton, David Eriksson, Maximilian Balandat, and Eytan Bakshy.
+\newblock Multi-objective bayesian optimization over high-dimensional search spaces.
+\newblock {\em CoRR}, abs/2109.10964, 2021.
+
+\bibitem{greed}
+George De~Ath, Richard~M. Everson, Alma A.~M. Rahat, and Jonathan~E. Fieldsend.
+\newblock Greed is good: Exploration and exploitation trade-offs in bayesian optimisation.
+\newblock {\em ACM Trans. Evol. Learn. Optim.}, 1(1), April 2021.
+
+\bibitem{turbo}
+David Eriksson, Michael Pearce, Jacob~R. Gardner, Ryan Turner, and Matthias Poloczek.
+\newblock Scalable global optimization via local bayesian optimization.
+\newblock {\em CoRR}, abs/1910.01739, 2019.
+
+\bibitem{gymnasium}
+Farama.
+\newblock Gymnasium, 2024.
+
+\bibitem{gpytorch}
+Jacob~R. Gardner, Geoff Pleiss, David Bindel, Kilian~Q. Weinberger, and Andrew~Gordon Wilson.
+\newblock Gpytorch: blackbox matrix-matrix gaussian process inference with gpu acceleration.
+\newblock In {\em Proceedings of the 32nd International Conference on Neural Information Processing Systems}, NIPS'18, page 7587–7597, Red Hook, NY, USA, 2018. Curran Associates Inc.
+
+\bibitem{cmaes}
+Nikolaus Hansen.
+\newblock The cma evolution strategy: A tutorial, 2023.
+
+\bibitem{forest}
+Frank Hutter, Holger~H. Hoos, and Kevin Leyton-Brown.
+\newblock Sequential model-based optimization for general algorithm configuration.
+\newblock In Carlos A.~Coello Coello, editor, {\em Learning and Intelligent Optimization}, pages 507--523, Berlin, Heidelberg, 2011. Springer Berlin Heidelberg.
+
+\bibitem{MOPTA08}
+Don~R. Jones.
+\newblock Mopta08 automotive benchmark problem: Large-scale multi‑disciplinary mass optimization in the auto industry.
+\newblock Presentation at the \emph{Modeling and Optimization: Theory and Applications} (MOPTA) Conference, 2008. Slides and benchmark files available at \url{https://www.miguelanjos.com/projects/3009-jones-benchmark}, 2008.
+\newblock Accessed 11~May 2025.
+
+\bibitem{bts}
+Kirthevasan Kandasamy, Akshay Krishnamurthy, Jeff Schneider, and Barnabas Poczos.
+\newblock Asynchronous parallel bayesian optimisation via thompson sampling, 2017.
+
+\bibitem{helicopter}
+H.~Kim, Michael Jordan, Shankar Sastry, and Andrew Ng.
+\newblock Autonomous helicopter flight via reinforcement learning.
+\newblock In S.~Thrun, L.~Saul, and B.~Sch\"{o}lkopf, editors, {\em Advances in Neural Information Processing Systems}, volume~16. MIT Press, 2003.
+
+\bibitem{ms}
+Lars Kotthoff, Hud Wahab, and Patrick Johnson.
+\newblock Bayesian optimization in materials science: A survey.
+\newblock {\em ArXiv}, abs/2108.00002, 2021.
+
+\bibitem{centerbias}
+Jakub Kudela.
+\newblock The evolutionary computation methods no one should use, 2023.
+
+\bibitem{ars}
+Horia Mania, Aurelia Guy, and Benjamin Recht.
+\newblock Simple random search of static linear policies is competitive for reinforcement learning.
+\newblock In S.~Bengio, H.~Wallach, H.~Larochelle, K.~Grauman, N.~Cesa-Bianchi, and R.~Garnett, editors, {\em Advances in Neural Information Processing Systems}, volume~31. Curran Associates, Inc., 2018.
+
+\bibitem{ax}
+Meta.
+\newblock Ax, 2023.
+
+\bibitem{botorch_code}
+Meta.
+\newblock Botorch, 2024.
+
+\bibitem{faiss_code}
+Meta.
+\newblock Faiss, 2024.
+
+\bibitem{optuna_code}
+Optuna.
+\newblock Optuna, 2025.
+
+\bibitem{love}
+Geoff Pleiss, Jacob~R. Gardner, Kilian~Q. Weinberger, and Andrew~Gordon Wilson.
+\newblock Constant-time predictive distributions for gaussian processes.
+\newblock {\em CoRR}, abs/1803.06058, 2018.
+
+\bibitem{ab}
+Federico Quin, Danny Weyns, Matthias Galster, and Camila~Costa Silva.
+\newblock A/b testing: A systematic literature review.
+\newblock {\em ArXiv}, abs/2308.04929, 2023.
+
+\bibitem{cts}
+Bahador Rashidi, Kerrick Johnstonbaugh, and Chao Gao.
+\newblock Cylindrical {T}hompson sampling for high-dimensional {B}ayesian optimization.
+\newblock In Sanjoy Dasgupta, Stephan Mandt, and Yingzhen Li, editors, {\em Proceedings of The 27th International Conference on Artificial Intelligence and Statistics}, volume 238 of {\em Proceedings of Machine Learning Research}, pages 3502--3510. PMLR, 02--04 May 2024.
+
+\bibitem{gpbook}
+Carl~Edward Rasmussen and Christopher K.~I. Williams.
+\newblock {\em Gaussian Processes for Machine Learning}.
+\newblock The MIT Press, 2006.
+
+\bibitem{dace}
+Thomas~J. Santner, Brian~J. Williams, and William~I. Notz.
+\newblock {\em The Design and Analysis of Computer Experiments}.
+\newblock Springer New York, NY, 2019.
+
+\bibitem{dngo}
+Jasper Snoek, Oren Rippel, Kevin Swersky, Ryan Kiros, Nadathur Satish, Narayanan Sundaram, Md. Mostofa~Ali Patwary, Prabhat Prabhat, and Ryan~P. Adams.
+\newblock Scalable bayesian optimization using deep neural networks.
+\newblock In {\em Proceedings of the 32nd International Conference on International Conference on Machine Learning - Volume 37}, ICML'15, page 2171–2180. JMLR.org, 2015.
+
+\bibitem{sfu}
+Sonya Surjanovic and Derek Bingham.
+\newblock Virtual library of simulation experiments: Optimization test problems.
+\newblock \url{http://www.sfu.ca/~ssurjano/optimization.html}, 2013.
+\newblock Accessed: 2023-10-25.
+
+\bibitem{e4e}
+David Sweet.
+\newblock {\em Experimentation for Engineers}.
+\newblock Manning, 2023.
+
+\bibitem{rembo}
+Ziyu Wang, Frank Hutter, Masrour Zoghi, David Matheson, and Nando de~Freitas.
+\newblock Bayesian optimization in a billion dimensions via random embeddings, 2016.
+
+\bibitem{tpe}
+Shuhei Watanabe.
+\newblock Tree-structured parzen estimator: Understanding its algorithm components and their roles for better empirical performance, 2023.
+
+\end{thebibliography}
