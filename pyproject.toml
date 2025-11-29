@@ -8,13 +8,15 @@ version = "0.1.0"
 description = "GPU-enabled Multi-Armed Bandits using PufferLib and PyTorch"
 readme = "README.md"
 requires-python = ">=3.12"
-authors = [{ name = "Mehul" }]
+authors = [{ name = "Mehul Bafna" }]
 dependencies = [
   "numpy>=1.24",
   "gymnasium>=0.29",
-  "pufferlib>=0.5,<3",
+  # PufferLib is sourced from Git via [tool.uv.sources] below (no version here)
+  "pufferlib",
   "rich>=13.7",
-  "torch>=2.9.1",
+  # Relax torch constraint to match widely available wheels (CPU/MPS/CUDA)
+  "torch>=2.2",
   "omegaconf>=2.3",
 ]
 
@@ -37,6 +39,7 @@ runner = "puffer_bandits.runner_puffer:main"
 runner-ctx = "puffer_bandits.runner_puffer_advanced:main"
 puffer-bandits-advanced = "puffer_bandits.runner_puffer_advanced:main"
 puffer-bandits-native = "puffer_bandits.runner_puffer_native:main"
+puffer-bandits-ppo = "puffer_bandits.runner_ppo:main"
 
 [tool.setuptools]
 packages = ["puffer_bandits"]
@@ -46,10 +49,9 @@ package-data = {"puffer_bandits" = ["py.typed"]}
 [tool.uv]
 # Use `uv sync` and `uv run`.
 
-#[tool.uv.sources]
-# Prefer installing pufferlib from PyPI. To use a local checkout instead,
-# uncomment and point to a valid Python project path:
-# pufferlib = { path = "../PufferLib" }
+[tool.uv.sources]
+# Install PufferLib from Git 3.0 branch explicitly
+pufferlib = { git = "https://github.com/PufferAI/PufferLib.git", rev = "3.0" }
 
 [tool.ruff]
 target-version = "py312"

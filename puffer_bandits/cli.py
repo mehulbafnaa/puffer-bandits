@@ -25,6 +25,7 @@ def main() -> None:
     p.add_argument("--config", type=str, default=None, help="YAML/TOML config file")
     p.add_argument("--set", action="append", default=None, help="Override config via dotlist, e.g., runs=1024")
     p.add_argument("--preset", type=str, default=None, help="native-only: {smoke,experiment,benchmark,neural}")
+    p.add_argument("--tui", action="store_true", help="Enable Rich TUI (CLI-only; ignored in config)")
     p.add_argument("--print-config", action="store_true", help="print the resolved config for the selected runner")
     args = p.parse_args()
 
@@ -42,6 +43,8 @@ def main() -> None:
             conf = OmegaConf.merge(conf, OmegaConf.load(args.config))
         if args.set:
             conf = OmegaConf.merge(conf, OmegaConf.from_dotlist(args.set))
+        # Enforce CLI-only for TUI
+        conf["tui"] = bool(getattr(args, "tui", False))
         conf_dict = OmegaConf.to_container(conf, resolve=True)  # type: ignore
         # Filter out non-dataclass keys (like 'runner')
         nkeys = set(NConfig.__dataclass_fields__.keys())
@@ -56,6 +59,7 @@ def main() -> None:
         from .runner_puffer_advanced import Config as AConfig, run_with_config as arun
         base = asdict(AConfig())
         conf_dict = _load_conf(base, args)
+        conf_dict["tui"] = bool(getattr(args, "tui", False))
         akeys = set(AConfig.__dataclass_fields__.keys())
         conf_dict = _filter_keys(conf_dict, akeys)  # type: ignore[arg-type]
         cfg = AConfig(**conf_dict)  # type: ignore
@@ -68,6 +72,7 @@ def main() -> None:
     from .runner_puffer import Config as CConfig, run_with_config as crun
     base = asdict(CConfig())
     conf_dict = _load_conf(base, args)
+    conf_dict["tui"] = bool(getattr(args, "tui", False))
     ckeys = set(CConfig.__dataclass_fields__.keys())
     conf_dict = _filter_keys(conf_dict, ckeys)  # type: ignore[arg-type]
     cfg = CConfig(**conf_dict)  # type: ignore

@@ -70,8 +70,10 @@ class RichTUI:
         layout["body"]["right"].split(
             self.Layout(name="hist_step"),
             self.Layout(name="hist_cum"),
-            self.Layout(name="values"),
+            self.Layout(name="explore"),
             self.Layout(name="perf"),
+            self.Layout(name="runinfo"),
+            self.Layout(name="values"),
             self.Layout(name="regret_top"),
         )
 
@@ -211,7 +213,14 @@ class RichTUI:
                cum_regret_by_arm: Optional[Sequence[float]] = None,
                last_ms: Optional[float] = None,
                ewma_ms: Optional[float] = None,
-               values_labels: Optional[Dict[str, str]] = None) -> None:
+               values_labels: Optional[Dict[str, str]] = None,
+               # Extra metrics (optional; shown when provided)
+               se_reward: Optional[float] = None,
+               conf_width: Optional[float] = None,
+               entropy: Optional[float] = None,
+               explore_ratio: Optional[float] = None,
+               vector_info: Optional[Dict[str, Any]] = None,
+               algo_info: Optional[Dict[str, Any]] = None) -> None:
         # Update progress
         self._progress.update(self._task, completed=t)
         # Update cumulative counts if provided by runner
@@ -238,8 +247,10 @@ class RichTUI:
 
         self.layout["body"]["right"]["hist_step"].update(self._hist_panel(actions))
         self.layout["body"]["right"]["hist_cum"].update(self._hist_cum_panel())
-        self.layout["body"]["right"]["values"].update(self._values_panel(values, labels=values_labels))
+        self.layout["body"]["right"]["explore"].update(self._explore_panel(se_reward, conf_width, entropy, explore_ratio))
         self.layout["body"]["right"]["perf"].update(self._perf_panel(last_ms, ewma_ms, sps=speed_sps))
+        self.layout["body"]["right"]["runinfo"].update(self._runinfo_panel(vector_info, algo_info))
+        self.layout["body"]["right"]["values"].update(self._values_panel(values, labels=values_labels))
         self.layout["body"]["right"]["regret_top"].update(self._regret_top_panel())
         self.live.update(self.layout, refresh=True)
 
@@ -248,3 +259,29 @@ class RichTUI:
             self.live.stop()
         except Exception:
             pass
+
+    def _explore_panel(self, se_reward: Optional[float], conf_width: Optional[float], entropy: Optional[float], explore_ratio: Optional[float]) -> "Panel":
+        tbl = self.Table(show_header=False, box=None)
+        tbl.add_column("metric", style="bold")
+        tbl.add_column("value")
+        if se_reward is not None:
+            tbl.add_row("reward SE", f"{se_reward:.4f}")
+        if conf_width is not None:
+            tbl.add_row("avg conf width", f"{conf_width:.4f}")
+        if entropy is not None:
+            tbl.add_row("policy entropy", f"{entropy:.4f}")
+        if explore_ratio is not None:
+            tbl.add_row("cold arms %", f"{explore_ratio*100.0:.1f}%")
+        return self.Panel(tbl, title="Exploration", border_style="blue")
+
+    def _runinfo_panel(self, vector_info: Optional[Dict[str, Any]], algo_info: Optional[Dict[str, Any]]) -> "Panel":
+        tbl = self.Table(show_header=False, box=None)
+        tbl.add_column("field", style="bold")
+        tbl.add_column("value")
+        if vector_info:
+            for k, v in vector_info.items():
+                tbl.add_row(str(k), str(v))
+        if algo_info:
+            for k, v in algo_info.items():
+                tbl.add_row(str(k), str(v))
+        return self.Panel(tbl, title="Run Info", border_style="white")

@@ -191,6 +191,9 @@ def parse_args() -> Config:
         elif val is not None:
             conf[key] = val
 
+    # Enforce: TUI is CLI-only (ignore config file value)
+    conf["tui"] = bool(getattr(args, "tui", False))
+
     cfg_dict = OmegaConf.to_container(conf, resolve=True)  # type: ignore
     return Config(**cfg_dict)  # type: ignore[arg-type]
 
@@ -285,6 +288,11 @@ def run_with_config(cfg: Config) -> None:
 
     T = cfg.T
     n = cfg.runs
+    # Preallocate small buffers to avoid per-step allocations/copies
+    rewards_t = torch.empty((n,), device=device, dtype=torch.float32)
+    obs_buf = None
+    if cfg.env == "contextual":
+        obs_buf = torch.empty((n, cfg.k, max(1, cfg.d)), device=device, dtype=torch.float32)
 
     # Optional Rich TUI
     tui = None
@@ -330,8 +338,10 @@ def run_with_config(cfg: Config) -> None:
     for t in range(1, T + 1):
         if cfg.env == "contextual":
             if isinstance(obs, np.ndarray):
-                obs_t = torch.from_numpy(obs).to(device=device, dtype=torch.float32)
-                actions = agent.select_actions(t, obs_t)
+                # Copy into preallocated buffer
+                assert obs_buf is not None
+                obs_buf.copy_(torch.from_numpy(obs).to(device=device, dtype=torch.float32))
+                actions = agent.select_actions(t, obs_buf)
             else:
                 actions = agent.select_actions(t)
         else:
@@ -339,11 +349,13 @@ def run_with_config(cfg: Config) -> None:
         t0 = time.perf_counter()
         atn_np = actions.detach().cpu().numpy()
         obs, r, _, _, infos = vec.step(atn_np)
-        rewards = torch.from_numpy(r.astype(np.float32)).to(device=device)
+        # Copy rewards into preallocated buffer
+        rewards_t.copy_(torch.from_numpy(r.astype(np.float32)).to(device=device))
         if cfg.env == "contextual":
-            agent.update(actions, rewards, obs_t)  # type: ignore[arg-type]
+            assert obs_buf is not None
+            agent.update(actions, rewards_t, obs_buf)  # type: ignore[arg-type]
         else:
-            agent.update(actions, rewards)
+            agent.update(actions, rewards_t)
         dt_ms = (time.perf_counter() - t0) * 1000.0
         last_ms = dt_ms
         if ewma_ms is None:
@@ -379,6 +391,139 @@ def run_with_config(cfg: Config) -> None:
 
             mem = memory_stats(device)
             speed_sps = 1000.0 / last_ms if last_ms > 0 else None
+            # Extra diagnostics (cheap)
+            se_reward = float(np.std(r, ddof=1) / np.sqrt(n)) if n > 1 else 0.0
+            conf_width = None
+            entropy = None
+            explore_ratio = None
+            # Contextual confidence width (LinUCB/LinTS)
+            try:
+                if cfg.env == "contextual" and isinstance(agent, LinUCB):
+                    assert obs_buf is not None
+                    batch = torch.arange(n, device=device)
+                    x_sel = obs_buf[batch, actions.long(), :]
+                    Ainv_sel = agent.A_inv[batch, actions.long(), :, :]
+                    x = x_sel.unsqueeze(-1)  # (n,d,1)
+                    Ax = torch.matmul(Ainv_sel, x)  # (n,d,1)
+                    quad = torch.matmul(x.transpose(1, 2), Ax).squeeze(-1).squeeze(-1)  # (n,)
+                    conf_width = float((cfg.alpha * torch.sqrt(quad.clamp_min(1e-12))).mean().item())
+                elif cfg.env == "contextual" and isinstance(agent, LinTS):
+                    assert obs_buf is not None
+                    batch = torch.arange(n, device=device)
+                    x_sel = obs_buf[batch, actions.long(), :]
+                    Ainv_sel = agent.A_inv[batch, actions.long(), :, :]
+                    x = x_sel.unsqueeze(-1)
+                    Ax = torch.matmul(Ainv_sel, x)
+                    quad = torch.matmul(x.transpose(1, 2), Ax).squeeze(-1).squeeze(-1)
+                    conf_width = float((cfg.v * torch.sqrt(quad.clamp_min(1e-12))).mean().item())
+            except Exception:
+                conf_width = None
+            # Adversarial policy entropy
+            try:
+                if isinstance(agent, EXP3) or isinstance(agent, EXP3IX):
+                    p = getattr(agent, "_last_p", None)
+                    if p is not None:
+                        entropy = float((-(p * (p.clamp_min(1e-12)).log()).sum(dim=1)).mean().item())
+            except Exception:
+                entropy = None
+            # Non-contextual "cold arms" ratio
+            try:
+                if isinstance(agent, KLUCB):
+                    explore_ratio = float((agent.N == 0).float().mean().item())
+                elif isinstance(agent, DiscountedUCB):
+                    explore_ratio = float((agent.Neff <= 1e-8).float().mean().item())
+                elif isinstance(agent, SlidingWindowUCB):
+                    explore_ratio = float((agent.Nw <= 1e-8).float().mean().item())
+            except Exception:
+                explore_ratio = None
+
+            vector_info = {
+                "runs": cfg.runs,
+                "workers": cfg.num_workers if cfg.num_workers is not None else "auto",
+                "vector": cfg.vector,
+            }
+            algo_info = {}
+            for key in ("alpha", "lam", "v", "gamma", "eta", "features", "hidden", "depth", "ensembles"):
+                val = getattr(cfg, key, None)
+                if val is not None:
+                    algo_info[key] = val
+            # Build per-arm value estimates for env 0 when available
+            values = None
+            values_labels = None
+            try:
+                values_rows = []
+                true_p0 = None
+                if isinstance(infos, list) and len(infos) > 0 and isinstance(infos[0], dict):
+                    p_vec0 = infos[0].get("p")
+                    if p_vec0 is not None:
+                        true_p0 = np.asarray(p_vec0, dtype=float)
+                if cfg.env == "contextual" and (isinstance(agent, LinUCB) or isinstance(agent, LinTS)):
+                    assert obs_buf is not None
+                    mu = torch.matmul(agent.A_inv, agent.b.unsqueeze(-1)).squeeze(-1)  # (n,k,d)
+                    mu0 = mu[0]
+                    x0 = obs_buf[0]
+                    est = torch.sigmoid((x0 * mu0).sum(dim=-1))  # (k,)
+                    # Confidence per arm for readability
+                    Ainv0 = agent.A_inv[0]
+                    x = x0.unsqueeze(-1)  # (k,d,1)
+                    Ax = torch.matmul(Ainv0, x).squeeze(-1)
+                    quad = (x0 * Ax).sum(dim=-1).clamp_min(1e-12)
+                    conf = (cfg.alpha if isinstance(agent, LinUCB) else cfg.v) * torch.sqrt(quad)
+                    est_np = est.detach().cpu().numpy()
+                    conf_np = conf.detach().cpu().numpy()
+                    order = np.argsort(-est_np)
+                    for i in order[:6]:
+                        tp = None if true_p0 is None else float(true_p0[int(i)])
+                        values_rows.append((int(i), float(est_np[int(i)]), tp, float(conf_np[int(i)])))
+                    values = values_rows
+                    values_labels = {"est": "est p", "true": "true p", "extra": "conf"}
+                elif isinstance(agent, EXP3) or isinstance(agent, EXP3IX):
+                    p = getattr(agent, "_last_p", None)
+                    if p is not None:
+                        p0 = p[0].detach().cpu().numpy()
+                        order = np.argsort(-p0)
+                        for i in order[:6]:
+                            tp = None if true_p0 is None else float(true_p0[int(i)])
+                            values_rows.append((int(i), float(p0[int(i)]), tp))
+                        values = values_rows
+                        values_labels = {"est": "policy p", "true": "true p"}
+                elif cfg.env == "bernoulli":
+                    if isinstance(agent, KLUCB):
+                        Q0 = agent.Q[0].detach().cpu().numpy()
+                        u0 = agent._ucb(t)[0].detach().cpu().numpy()
+                        w0 = (u0 - Q0)
+                        order = np.argsort(-Q0)
+                        for i in order[:6]:
+                            tp = None if true_p0 is None else float(true_p0[int(i)])
+                            values_rows.append((int(i), float(Q0[int(i)]), tp, float(w0[int(i)])))
+                        values = values_rows
+                        values_labels = {"est": "Q", "true": "true p", "extra": "width"}
+                    elif isinstance(agent, DiscountedUCB):
+                        S0 = agent.S[0].detach().cpu().numpy()
+                        N0 = agent.Neff[0].detach().cpu().numpy()
+                        Q0 = np.divide(S0, np.maximum(N0, 1e-8))
+                        width = agent.c * np.sqrt(np.log(max(1, t)) / np.maximum(N0, 1e-8))
+                        order = np.argsort(-Q0)
+                        for i in order[:6]:
+                            tp = None if true_p0 is None else float(true_p0[int(i)])
+                            values_rows.append((int(i), float(Q0[int(i)]), tp, float(width[int(i)])))
+                        values = values_rows
+                        values_labels = {"est": "Qd", "true": "true p", "extra": "width"}
+                    elif isinstance(agent, SlidingWindowUCB):
+                        S0 = agent.Sw[0].detach().cpu().numpy()
+                        N0 = agent.Nw[0].detach().cpu().numpy()
+                        Q0 = np.divide(S0, np.maximum(N0, 1e-8))
+                        eff_t = max(1, min(t, int(agent.window)))
+                        width = agent.c * np.sqrt(np.log(eff_t) / np.maximum(N0, 1e-8))
+                        order = np.argsort(-Q0)
+                        for i in order[:6]:
+                            tp = None if true_p0 is None else float(true_p0[int(i)])
+                            values_rows.append((int(i), float(Q0[int(i)]), tp, float(width[int(i)])))
+                        values = values_rows
+                        values_labels = {"est": "Qw", "true": "true p", "extra": "width"}
+            except Exception:
+                values = None
+                values_labels = None
             try:
                 tui.update(
                     t=t,
@@ -387,13 +532,19 @@ def run_with_config(cfg: Config) -> None:
                     regret=float(cum_regret_total),
                     actions=atn_np.tolist(),
                     mem=mem,
-                    values=None,
+                    values=values,
                     speed_sps=speed_sps,
                     cum_counts=cum_counts.tolist(),
                     cum_regret_by_arm=cum_regret_by_arm.tolist(),
                     last_ms=last_ms,
                     ewma_ms=ewma_ms,
-                    values_labels=None,
+                    values_labels=values_labels,
+                    se_reward=se_reward,
+                    conf_width=conf_width,
+                    entropy=entropy,
+                    explore_ratio=explore_ratio,
+                    vector_info=vector_info,
+                    algo_info=algo_info,
                 )
             except Exception:
                 pass
@@ -421,6 +572,10 @@ def run_with_config(cfg: Config) -> None:
         wb_finish(wb)
 
 
-if __name__ == "__main__":
+def main() -> None:
     cfg = parse_args()
     run_with_config(cfg)
+
+
+if __name__ == "__main__":
+    main()
