@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -30,4 +29,3 @@ class SlidingWindowState:
     act_buf: torch.Tensor     # (window, n)
     rew_buf: torch.Tensor     # (window, n)
     t: int
-

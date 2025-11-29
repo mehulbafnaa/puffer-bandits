@@ -12,9 +12,10 @@ authors = [{ name = "Mehul" }]
 dependencies = [
   "numpy>=1.24",
   "gymnasium>=0.29",
-  "matplotlib>=3.8",
-  "pufferlib>=0.5",
+  "pufferlib>=0.5,<3",
   "rich>=13.7",
+  "torch>=2.9.1",
+  "omegaconf>=2.3",
 ]
 
 [project.optional-dependencies]
@@ -24,8 +25,12 @@ test = [
 wandb = [
   "wandb>=0.16",
 ]
+plots = [
+  "matplotlib>=3.8",
+]
 
 [project.scripts]
+puffer-bandits = "puffer_bandits.cli:main"
 puffer-bandits-runner = "puffer_bandits.runner_puffer:main"
 # Alias used in README for convenience
 runner = "puffer_bandits.runner_puffer:main"
@@ -36,6 +41,7 @@ puffer-bandits-native = "puffer_bandits.runner_puffer_native:main"
 [tool.setuptools]
 packages = ["puffer_bandits"]
 package-dir = {"puffer_bandits" = "puffer_bandits"}
+package-data = {"puffer_bandits" = ["py.typed"]}
 
 [tool.uv]
 # Use `uv sync` and `uv run`.

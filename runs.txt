@@ -61,8 +61,8 @@ Sweeps & Plots (batch)
 All‑in sweep script (already added):
 bash scripts/run_all.sh mps
 Plot a sweep:
-uv run python puffer_bandits/plot_sweeps.py --file plots_gpu/summary.csv --algo klucb --param c --out plots_gpu/sweep_klucb_c.png
-uv run python puffer_bandits/plot_sweeps.py --file plots_gpu/advanced_summary.csv --algo linucb --param alpha --out plots_gpu/sweep_linucb_alpha.png
+uv run python puffer_bandits/plot_sweeps.py --file plots/summary.csv --algo klucb --param c --out plots/sweep_klucb_c.png
+uv run python puffer_bandits/plot_sweeps.py --file plots/advanced_summary.csv --algo linucb --param alpha --out plots/sweep_linucb_alpha.png
 Hyperparameter Ranges (guidance)
 
 KLUCB: alpha ~ 1.0–3.0

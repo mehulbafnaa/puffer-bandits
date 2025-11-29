@@ -1,0 +1,26 @@
+runner: native
+env: contextual
+algo: linucb
+
+# Problem size
+k: 10
+d: 8
+T: 2000
+runs: 1024
+seed: 0
+
+# Agent
+alpha: 1.0
+lam: 1.0
+
+# Vectorization & device
+vector: mp
+num_workers: 8
+device: mps
+tui: true
+log_every: 100
+
+# Logging (optional)
+wandb: false
+wandb_project: puffer-bandits
+

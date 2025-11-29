@@ -1,14 +1,14 @@
-from __future__ import annotations
 
 import argparse
 import os
 import time
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Literal
 
 import numpy as np
 import torch
+from omegaconf import OmegaConf  # type: ignore
 
 CORES = os.cpu_count() or 1
 
@@ -51,7 +51,7 @@ class Config:
     device: str | None = None
     log_every: int = 100
     # Output (like MAB_solutions)
-    outdir: str = "plots_gpu"
+    outdir: str = "plots"
     save_csv: bool = False
     debug_devices: bool = False
     profile: bool = False
@@ -67,11 +67,11 @@ class Config:
 def parse_args() -> Config:
     p = argparse.ArgumentParser("Bandit experiments (PufferLib)")
     # Problem
-    p.add_argument("--algo", type=str, choices=["klucb", "ducb", "swucb"], default="klucb")
-    p.add_argument("--k", type=int, default=10)
-    p.add_argument("--T", type=int, default=1000)
-    p.add_argument("--runs", type=int, default=4096, help="number of parallel envs")
-    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--algo", type=str, choices=["klucb", "ducb", "swucb"], default=None)
+    p.add_argument("--k", type=int, default=None)
+    p.add_argument("--T", type=int, default=None)
+    p.add_argument("--runs", type=int, default=None, help="number of parallel envs")
+    p.add_argument("--seed", type=int, default=None)
     # Agent hyperparameters
     p.add_argument("--c", type=float, default=None)
     p.add_argument("--kl-alpha", type=float, default=None, dest="kl_alpha")
@@ -79,14 +79,14 @@ def parse_args() -> Config:
     p.add_argument("--window", type=int, default=None)
     # Environment
     p.add_argument("--nonstationary", action="store_true")
-    p.add_argument("--sigma", type=float, default=0.1)
+    p.add_argument("--sigma", type=float, default=None)
     # Vectorization
     p.add_argument("--num-workers", type=int, default=None)
     p.add_argument("--batch-size", type=int, default=None)
     p.add_argument("--device", type=str, default=None)
-    p.add_argument("--log-every", type=int, default=100)
+    p.add_argument("--log-every", type=int, default=None)
     # Output
-    p.add_argument("--outdir", type=str, default="plots_gpu")
+    p.add_argument("--outdir", type=str, default=None)
     p.add_argument("--save-csv", action="store_true")
     p.add_argument("--debug-devices", action="store_true")
     p.add_argument("--profile", action="store_true", help="print per-step timing breakdowns")
@@ -100,37 +100,37 @@ def parse_args() -> Config:
     # Backward-compatible aliases
     p.add_argument("--agent", type=str, choices=["klucb", "ducb", "swucb"], default=None)
     p.add_argument("--num-envs", type=int, default=None)
+    # Config-driven
+    p.add_argument("--config", type=str, default=None, help="Path to YAML/TOML config")
+    p.add_argument("--set", action="append", default=None, help="Override config with dotlist, e.g., runs=1024")
 
     args = p.parse_args()
-    algo = args.algo if args.agent is None else args.agent
-    runs = args.runs if args.num_envs is None else args.num_envs
-    return Config(
-        algo=algo,  # type: ignore
-        k=args.k,
-        T=args.T,
-        runs=runs,
-        seed=args.seed,
-        c=args.c,
-        kl_alpha=args.kl_alpha,
-        discount=args.discount,
-        window=args.window,
-        nonstationary=args.nonstationary,
-        sigma=args.sigma,
-        num_workers=args.num_workers,
-        batch_size=args.batch_size,
-        device=args.device,
-        log_every=args.log_every,
-        outdir=args.outdir,
-        save_csv=bool(args.save_csv),
-        debug_devices=bool(args.debug_devices),
-        profile=bool(args.profile),
-        wandb=bool(args.wandb),
-        wandb_project=args.wandb_project,
-        wandb_entity=args.wandb_entity,
-        wandb_tags=args.wandb_tags,
-        wandb_offline=bool(args.wandb_offline),
-        run_name=args.run_name,
-    )
+
+    # Build config: defaults -> file -> dotlist -> CLI explicit overrides (incl. aliases)
+    conf = OmegaConf.create(asdict(Config()))
+    if args.config:
+        conf = OmegaConf.merge(conf, OmegaConf.load(args.config))
+    if args.set:
+        conf = OmegaConf.merge(conf, OmegaConf.from_dotlist(args.set))
+
+    # Map aliases into the overlay dict
+    overlay = dict(vars(args))
+    if overlay.get("agent") is not None and overlay.get("algo") is None:
+        overlay["algo"] = overlay["agent"]
+    if overlay.get("num_envs") is not None and overlay.get("runs") is None:
+        overlay["runs"] = overlay["num_envs"]
+
+    for key, val in overlay.items():
+        if key in {"config", "set", "agent", "num_envs"}:
+            continue
+        if isinstance(val, bool):
+            if val:
+                conf[key] = val
+        elif val is not None:
+            conf[key] = val
+
+    cfg_dict = OmegaConf.to_container(conf, resolve=True)  # type: ignore
+    return Config(**cfg_dict)  # type: ignore[arg-type]
 
 
 def build_envs(cfg: Config) -> Multiprocessing:
@@ -148,9 +148,16 @@ def build_envs(cfg: Config) -> Multiprocessing:
     # caller can override with --num-workers
     num_workers = cfg.num_workers
     if num_workers is None:
-        num_workers = min(cfg.runs, CORES)
-    # Clamp workers to [1, num_envs] to avoid division by zero in vectorizer
+        # Choose a default that divides runs if possible
+        candidate = min(cfg.runs, CORES)
+        while candidate > 1 and (cfg.runs % candidate) != 0:
+            candidate -= 1
+        num_workers = max(1, candidate)
+    # Clamp and guard divisibility
     num_workers = max(1, min(num_workers, cfg.runs))
+    if (cfg.runs % num_workers) != 0:
+        print(f"[vector] runs={cfg.runs} not divisible by num_workers={num_workers}; using 1 worker.")
+        num_workers = 1
 
     # Note: PufferLib enforces num_workers <= physical cores by default.
     # To avoid APIUsageError across platforms (e.g., os.cpu_count may exceed
@@ -178,8 +185,7 @@ def build_agent(cfg: Config, device: torch.device):
     raise ValueError("unknown agent")
 
 
-def main() -> None:
-    cfg = parse_args()
+def run_with_config(cfg: Config) -> None:
     device = pick_device(cfg.device)
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
@@ -188,6 +194,12 @@ def main() -> None:
     obs, infos = vec.reset(seed=cfg.seed)  # ignore obs
 
     agent = build_agent(cfg, device)
+    # Explicit per-agent RNG seed for determinism across devices
+    try:
+        agent.rng = torch.Generator(device=device)
+        agent.rng.manual_seed(int(cfg.seed))
+    except Exception:
+        pass
     agent.reset()
     if cfg.debug_devices:
         # Print initial devices and wrap agent for one-time logging
@@ -231,36 +243,29 @@ def main() -> None:
                 pass
 
     # Optional Weights & Biases
-    wb = None
-    if cfg.wandb:
-        try:
-            import os as _os
-            import wandb as _wandb  # type: ignore
-            if cfg.wandb_offline:
-                _os.environ.setdefault("WANDB_MODE", "offline")
-            run_name = cfg.run_name or f"classic-{cfg.algo}-k{cfg.k}-T{cfg.T}-n{cfg.runs}-{device}-{cfg.seed}"
-            wb_cfg = {
-                "runner": "classic",
-                "algo": cfg.algo,
-                "k": cfg.k,
-                "T": cfg.T,
-                "runs": cfg.runs,
-                "device": str(device),
-                "seed": cfg.seed,
-                "nonstationary": cfg.nonstationary,
-                "sigma": cfg.sigma,
-                "outdir": cfg.outdir,
-            }
-            wb = _wandb.init(
-                project=cfg.wandb_project or "puffer-bandits",
-                entity=cfg.wandb_entity,
-                name=run_name,
-                config=wb_cfg,
-                tags=[t.strip() for t in (cfg.wandb_tags or "").split(",") if t.strip()],
-                reinit=True,
-            )
-        except Exception:
-            wb = None
+    from .utils.wandb import wb_init, wb_log, wb_finish
+    run_name = cfg.run_name or f"classic-{cfg.algo}-k{cfg.k}-T{cfg.T}-n{cfg.runs}-{device}-{cfg.seed}"
+    wb_cfg = {
+        "runner": "classic",
+        "algo": cfg.algo,
+        "k": cfg.k,
+        "T": cfg.T,
+        "runs": cfg.runs,
+        "device": str(device),
+        "seed": cfg.seed,
+        "nonstationary": cfg.nonstationary,
+        "sigma": cfg.sigma,
+        "outdir": cfg.outdir,
+    }
+    wb = wb_init(
+        enabled=cfg.wandb,
+        project=cfg.wandb_project,
+        entity=cfg.wandb_entity,
+        tags=cfg.wandb_tags,
+        run_name=run_name,
+        offline=cfg.wandb_offline,
+        config=wb_cfg,
+    )
 
     for t in range(1, T + 1):
         if cfg.profile:
@@ -348,16 +353,7 @@ def main() -> None:
         if t % cfg.log_every == 0:
             print(f"t={t} mean_reward={m:.4f} %optimal={pct:.2f} regret={rg_m:.4f}")
             if wb is not None:
-                try:
-                    import wandb as _wandb  # type: ignore
-                    _wandb.log({
-                        "t": t,
-                        "mean_reward": m,
-                        "%_optimal": pct,
-                        "cumulative_regret": rg_m,
-                    }, step=t)
-                except Exception:
-                    pass
+                wb_log(wb, {"t": t, "mean_reward": m, "%_optimal": pct, "cumulative_regret": rg_m}, step=t)
             if cfg.profile:
                 steps_done = t
                 ms = {k: 1000.0 * v / steps_done for k, v in prof.items()}
@@ -399,19 +395,34 @@ def main() -> None:
         plt.plot(x, mean_reward, label="mean reward")
         plt.fill_between(x, reward_lo, reward_hi, alpha=0.2, label="95% CI")
         plt.xlabel("t"); plt.ylabel("Mean reward"); plt.legend(); plt.tight_layout()
-        plt.savefig(os.path.join(cfg.outdir, f"reward_{tag()}.png")); plt.close()
+        reward_path = os.path.join(cfg.outdir, f"reward_{tag()}.png")
+        plt.savefig(reward_path); plt.close()
 
         plt.figure(figsize=(6,4))
         plt.plot(x, pct_opt, label="% optimal")
         plt.fill_between(x, pct_opt_lo, pct_opt_hi, alpha=0.2, label="95% CI")
         plt.xlabel("t"); plt.ylabel("% optimal"); plt.legend(); plt.tight_layout()
-        plt.savefig(os.path.join(cfg.outdir, f"pct_optimal_{tag()}.png")); plt.close()
+        pct_path = os.path.join(cfg.outdir, f"pct_optimal_{tag()}.png")
+        plt.savefig(pct_path); plt.close()
 
         plt.figure(figsize=(6,4))
         plt.plot(x, cumulative_regret, label="cumulative regret")
         plt.fill_between(x, cumulative_regret_lo, cumulative_regret_hi, alpha=0.2, label="95% CI")
         plt.xlabel("t"); plt.ylabel("Cumulative regret"); plt.legend(); plt.tight_layout()
-        plt.savefig(os.path.join(cfg.outdir, f"regret_{tag()}.png")); plt.close()
+        regret_path = os.path.join(cfg.outdir, f"regret_{tag()}.png")
+        plt.savefig(regret_path); plt.close()
+
+        # Log plots to W&B if enabled
+        if wb is not None:
+            try:
+                import wandb as _wandb  # type: ignore
+                wb_log(wb, {
+                    "plots/reward": _wandb.Image(reward_path),
+                    "plots/pct_optimal": _wandb.Image(pct_path),
+                    "plots/regret": _wandb.Image(regret_path),
+                })
+            except Exception:
+                pass
     else:
         print("Warning: matplotlib not available; skipping plots")
 
@@ -426,15 +437,20 @@ def main() -> None:
                 cfg.algo, cfg.k, T, cfg.runs, cfg.seed, cfg.c, cfg.nonstationary, cfg.sigma,
                 float(mean_reward[-1]), float(pct_opt[-1]), float(cumulative_regret[-1])
             ])
+        if wb is not None:
+            try:
+                import wandb as _wandb  # type: ignore
+                art_name = f"summary-{cfg.algo}-k{cfg.k}-T{T}-n{cfg.runs}-s{cfg.seed}"
+                art = _wandb.Artifact(art_name, type="metrics")
+                art.add_file(path)
+                _wandb.log_artifact(art)
+            except Exception:
+                pass
 
     print(f"Mean reward (first 5): {np.round(mean_reward[:5], 3)}")
     print(f"% optimal (first 5): {np.round(pct_opt[:5], 1)}")
     if wb is not None:
-        try:
-            import wandb as _wandb  # type: ignore
-            _wandb.finish()
-        except Exception:
-            pass
+        wb_finish(wb)
     if cfg.profile:
         ms = {k: 1000.0 * v / T for k, v in prof.items()}
         print(
@@ -448,4 +464,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    cfg = parse_args()
+    run_with_config(cfg)

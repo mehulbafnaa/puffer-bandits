@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 """Contextual bandit Gymnasium environment for vectorized experiments.
 
@@ -137,4 +136,3 @@ class ContextualBanditEnv(BaseEnv):
         plt.title("Contextual Bandit (current step probabilities)")
         plt.pause(0.001)
         return None
-

@@ -1,0 +1,26 @@
+runner: classic
+algo: klucb
+
+# Problem size
+k: 10
+T: 2000
+runs: 1024
+seed: 0
+
+# Env
+nonstationary: false
+sigma: 0.1
+
+# Vectorization & device
+num_workers: 8
+device: cpu
+log_every: 200
+
+# Output
+outdir: plots
+save_csv: true
+
+# Logging (optional)
+wandb: false
+wandb_project: puffer-bandits
+

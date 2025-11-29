@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 """Minimal Gymnasium environment for a k-armed Bernoulli bandit.
 
@@ -130,4 +129,3 @@ class BernoulliBanditEnv(BaseEnv):
         plt.title("Bernoulli Bandit (true probabilities)")
         plt.pause(0.001)
         return None
-

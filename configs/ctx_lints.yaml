@@ -1,0 +1,26 @@
+runner: native
+env: contextual
+algo: lints
+
+# Problem size
+k: 10
+d: 8
+T: 1500
+runs: 1024
+seed: 0
+
+# Agent (LinTS)
+v: 0.1
+lam: 1.0
+
+# Vectorization & device
+vector: mp
+num_workers: 8
+device: mps
+tui: true
+log_every: 100
+
+# Logging (optional)
+wandb: false
+wandb_project: puffer-bandits
+

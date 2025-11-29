@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import os
 from typing import Any
@@ -74,4 +73,3 @@ def memory_stats(device: torch.device) -> dict[str, Any]:
         except Exception:
             return {}
     return {}
-

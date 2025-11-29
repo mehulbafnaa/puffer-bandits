@@ -1,15 +1,15 @@
-from __future__ import annotations
 
 import argparse
 import os
 import sys
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Literal
 import time
 
 import numpy as np
 import torch
 from pufferlib.vector import Multiprocessing, Serial
+from omegaconf import OmegaConf  # type: ignore
 
 from .agents_ctx import (
     EXP3,
@@ -116,45 +116,45 @@ def parse_args() -> Config:
     p = argparse.ArgumentParser("Native PufferLib runner for puffer-bandits")
     p.add_argument("--preset", type=str, choices=list(PRESETS.keys()), default=None, 
                    help="Use preset configuration (smoke, experiment, benchmark, neural)")
-    p.add_argument("--env", type=str, choices=["contextual", "bernoulli", "dataset"], default="contextual")
-    p.add_argument("--algo", type=str, default="linucb")
-    p.add_argument("--k", type=int, default=10)
-    p.add_argument("--d", type=int, default=8)
-    p.add_argument("--T", type=int, default=1000)
-    p.add_argument("--runs", type=int, default=512)
-    p.add_argument("--seed", type=int, default=0)
-    p.add_argument("--theta-sigma", type=float, default=0.05)
-    p.add_argument("--x-sigma", type=float, default=1.0)
+    p.add_argument("--env", type=str, choices=["contextual", "bernoulli", "dataset"], default=None)
+    p.add_argument("--algo", type=str, default=None)
+    p.add_argument("--k", type=int, default=None)
+    p.add_argument("--d", type=int, default=None)
+    p.add_argument("--T", type=int, default=None)
+    p.add_argument("--runs", type=int, default=None)
+    p.add_argument("--seed", type=int, default=None)
+    p.add_argument("--theta-sigma", type=float, default=None)
+    p.add_argument("--x-sigma", type=float, default=None)
     p.add_argument("--nonstationary", action="store_true")
-    p.add_argument("--sigma", type=float, default=0.1)
+    p.add_argument("--sigma", type=float, default=None)
     # Agents
-    p.add_argument("--alpha", type=float, default=1.0)
-    p.add_argument("--lam", type=float, default=1.0)
-    p.add_argument("--v", type=float, default=0.1)
-    p.add_argument("--gamma", type=float, default=0.07)
+    p.add_argument("--alpha", type=float, default=None)
+    p.add_argument("--lam", type=float, default=None)
+    p.add_argument("--v", type=float, default=None)
+    p.add_argument("--gamma", type=float, default=None)
     p.add_argument("--eta", type=float, default=None)
-    p.add_argument("--hidden", type=int, default=128)
-    p.add_argument("--depth", type=int, default=2)
-    p.add_argument("--ensembles", type=int, default=3)
-    p.add_argument("--dropout", type=float, default=0.1)
-    p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--features", type=int, default=64)
-    p.add_argument("--linlam", type=float, default=1.0)
-    p.add_argument("--linv", type=float, default=0.1)
+    p.add_argument("--hidden", type=int, default=None)
+    p.add_argument("--depth", type=int, default=None)
+    p.add_argument("--ensembles", type=int, default=None)
+    p.add_argument("--dropout", type=float, default=None)
+    p.add_argument("--lr", type=float, default=None)
+    p.add_argument("--features", type=int, default=None)
+    p.add_argument("--linlam", type=float, default=None)
+    p.add_argument("--linv", type=float, default=None)
     # Vectorization
-    p.add_argument("--vector", type=str, choices=["mp", "serial"], default="mp")
+    p.add_argument("--vector", type=str, choices=["mp", "serial"], default=None)
     p.add_argument("--num-workers", type=int, default=None)
     p.add_argument("--batch-size", type=int, default=None)
     p.add_argument("--device", type=str, default=None)
     p.add_argument("--force-device", action="store_true")
     p.add_argument("--no-amp", action="store_false", dest="amp")
-    p.add_argument("--log-every", type=int, default=100)
+    p.add_argument("--log-every", type=int, default=None)
     p.add_argument("--tui", action="store_true", help="Rich TUI console dashboard (no matplotlib)")
     # Dataset args (used when --env dataset)
     p.add_argument("--data-path", type=str, default=None, help="Path to NPZ with keys X and (P or Y)")
-    p.add_argument("--x-key", type=str, default="X")
-    p.add_argument("--p-key", type=str, default="P")
-    p.add_argument("--y-key", type=str, default="Y")
+    p.add_argument("--x-key", type=str, default=None)
+    p.add_argument("--p-key", type=str, default=None)
+    p.add_argument("--y-key", type=str, default=None)
     # Weights & Biases (optional)
     p.add_argument("--wandb", action="store_true", help="Log metrics to Weights & Biases")
     p.add_argument("--wandb-project", type=str, default=None)
@@ -162,29 +162,37 @@ def parse_args() -> Config:
     p.add_argument("--wandb-tags", type=str, default=None, help=",-separated tags")
     p.add_argument("--wandb-offline", action="store_true")
     p.add_argument("--run-name", type=str, default=None)
+
+    # Config-driven
+    p.add_argument("--config", type=str, default=None, help="Path to YAML/TOML config")
+    p.add_argument("--set", action="append", default=None, help="Override config with dotlist, e.g., sizes.runs=1024")
     args = p.parse_args()
     
-    # Apply preset defaults first, then CLI overrides
-    config_dict = {}
+    # Build config: defaults -> preset -> file -> dotlist -> CLI (explicit only)
+    base = asdict(Config())
+    conf = OmegaConf.create(base)
     if args.preset:
         if args.preset not in PRESETS:
             raise ValueError(f"Unknown preset: {args.preset}")
-        config_dict.update(PRESETS[args.preset])
+        conf = OmegaConf.merge(conf, OmegaConf.create(PRESETS[args.preset]))
         print(f"[preset] Using '{args.preset}' preset with smart defaults")
-    
-    # Explicit CLI args override preset
-    config_dict.update({
-        "env": args.env, "algo": args.algo, "k": args.k, "d": args.d, "T": args.T, "runs": args.runs,
-        "seed": args.seed, "theta_sigma": args.theta_sigma, "x_sigma": args.x_sigma, "nonstationary": bool(args.nonstationary), "sigma": args.sigma,
-        "alpha": args.alpha, "lam": args.lam, "v": args.v, "gamma": args.gamma, "eta": args.eta, "hidden": args.hidden, "depth": args.depth,
-        "ensembles": args.ensembles, "dropout": args.dropout, "lr": args.lr, "features": args.features, "linlam": args.linlam, "linv": args.linv,
-        "vector": args.vector, "num_workers": args.num_workers, "batch_size": args.batch_size, "device": args.device, "force_device": bool(args.force_device),
-        "amp": bool(args.amp), "log_every": args.log_every, "tui": bool(args.tui),
-        "data_path": args.data_path, "x_key": args.x_key, "p_key": args.p_key, "y_key": args.y_key,
-    })
+    if args.config:
+        conf = OmegaConf.merge(conf, OmegaConf.load(args.config))
+    if args.set:
+        conf = OmegaConf.merge(conf, OmegaConf.from_dotlist(args.set))
 
-    cfg = Config(**config_dict)
-    return cfg
+    # Overlay explicit CLI arguments
+    for key, val in vars(args).items():
+        if key in {"preset", "config", "set"}:
+            continue
+        if isinstance(val, bool):
+            if val:
+                conf[key] = val
+        elif val is not None:
+            conf[key] = val
+
+    cfg_dict = OmegaConf.to_container(conf, resolve=True)  # type: ignore
+    return Config(**cfg_dict)  # type: ignore[arg-type]
 
 
 def build_envs(cfg: Config):
@@ -208,8 +216,17 @@ def build_envs(cfg: Config):
             raise FileNotFoundError(f"Dataset NPZ not found: {cfg.data_path}")
         env_kwargs = [dict(k=cfg.k, d=cfg.d, data_path=cfg.data_path, x_key=cfg.x_key, p_key=cfg.p_key, y_key=cfg.y_key) for _ in range(cfg.runs)]
 
-    num_workers = cfg.num_workers if cfg.num_workers is not None else min(cfg.runs, os.cpu_count() or 1)
-    num_workers = max(1, min(num_workers, cfg.runs))
+    if cfg.num_workers is None:
+        cores = os.cpu_count() or 1
+        candidate = min(cfg.runs, cores)
+        while candidate > 1 and (cfg.runs % candidate) != 0:
+            candidate -= 1
+        num_workers = max(1, candidate)
+    else:
+        num_workers = max(1, min(cfg.num_workers, cfg.runs))
+        if (cfg.runs % num_workers) != 0:
+            print(f"[vector] runs={cfg.runs} not divisible by num_workers={num_workers}; using 1 worker.")
+            num_workers = 1
 
     return Vec(
         env_creators=envs,
@@ -249,8 +266,7 @@ def build_agent(cfg: Config, device: torch.device):
     raise ValueError("Unknown env/algo combination")
 
 
-def main() -> None:
-    cfg = parse_args()
+def run_with_config(cfg: Config) -> None:
     device = pick_device(cfg.device)
     torch.manual_seed(cfg.seed)
     np.random.seed(cfg.seed)
@@ -259,6 +275,12 @@ def main() -> None:
     obs, infos = vec.reset(seed=cfg.seed)
 
     agent = build_agent(cfg, device)
+    # Explicit per-agent RNG seed for determinism across devices
+    try:
+        agent.rng = torch.Generator(device=device)
+        agent.rng.manual_seed(int(cfg.seed))
+    except Exception:
+        pass
     agent.reset()
 
     T = cfg.T
@@ -280,37 +302,30 @@ def main() -> None:
     ewma_ms: float | None = None
 
     # Optional Weights & Biases
-    wb = None
-    if cfg.wandb:
-        try:
-            import os as _os
-            import wandb as _wandb  # type: ignore
-            if cfg.wandb_offline:
-                _os.environ.setdefault("WANDB_MODE", "offline")
-            run_name = cfg.run_name or f"native-{cfg.env}-{cfg.algo}-k{cfg.k}-d{cfg.d}-n{cfg.runs}-{device}-{cfg.seed}"
-            wb_cfg = {
-                "runner": "native",
-                "env": cfg.env,
-                "algo": cfg.algo,
-                "k": cfg.k,
-                "d": cfg.d,
-                "T": cfg.T,
-                "runs": cfg.runs,
-                "device": str(device),
-                "seed": cfg.seed,
-                "vector": cfg.vector,
-                "num_workers": cfg.num_workers,
-            }
-            wb = _wandb.init(
-                project=cfg.wandb_project or "puffer-bandits",
-                entity=cfg.wandb_entity,
-                name=run_name,
-                config=wb_cfg,
-                tags=[t.strip() for t in (cfg.wandb_tags or "").split(",") if t.strip()],
-                reinit=True,
-            )
-        except Exception:
-            wb = None
+    from .utils.wandb import wb_init, wb_log, wb_finish
+    run_name = cfg.run_name or f"native-{cfg.env}-{cfg.algo}-k{cfg.k}-d{cfg.d}-n{cfg.runs}-{device}-{cfg.seed}"
+    wb_cfg = {
+        "runner": "native",
+        "env": cfg.env,
+        "algo": cfg.algo,
+        "k": cfg.k,
+        "d": cfg.d,
+        "T": cfg.T,
+        "runs": cfg.runs,
+        "device": str(device),
+        "seed": cfg.seed,
+        "vector": cfg.vector,
+        "num_workers": cfg.num_workers,
+    }
+    wb = wb_init(
+        enabled=cfg.wandb,
+        project=cfg.wandb_project,
+        entity=cfg.wandb_entity,
+        tags=cfg.wandb_tags,
+        run_name=run_name,
+        offline=cfg.wandb_offline,
+        config=wb_cfg,
+    )
 
     for t in range(1, T + 1):
         if cfg.env == "contextual":
@@ -383,18 +398,18 @@ def main() -> None:
             except Exception:
                 pass
         if wb is not None and (t % cfg.log_every == 0):
-            try:
-                import wandb as _wandb  # type: ignore
-                _wandb.log({
+            wb_log(
+                wb,
+                {
                     "t": t,
                     "mean_reward": float(np.mean(r)),
                     "%_optimal": pct_opt,
                     "cumulative_regret": float(cum_regret_total),
                     "last_ms": last_ms,
                     "ewma_ms": ewma_ms,
-                }, step=t)
-            except Exception:
-                pass
+                },
+                step=t,
+            )
 
     vec.close()
     if tui is not None:
@@ -403,12 +418,9 @@ def main() -> None:
         except Exception:
             pass
     if wb is not None:
-        try:
-            import wandb as _wandb  # type: ignore
-            _wandb.finish()
-        except Exception:
-            pass
+        wb_finish(wb)
 
 
 if __name__ == "__main__":
-    main()
+    cfg = parse_args()
+    run_with_config(cfg)

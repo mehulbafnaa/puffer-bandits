@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import torch
 
@@ -27,4 +26,3 @@ def exp3_update_factor(p_sel: torch.Tensor, rewards: torch.Tensor, eta: float, k
     """Compute multiplicative factor to update selected weights: exp(eta * r_hat / k)."""
     r_hat = rewards / p_sel.clamp_min(1e-12)
     return torch.exp(eta * r_hat / float(k))
-

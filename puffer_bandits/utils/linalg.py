@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import torch
 
@@ -24,4 +23,3 @@ def safe_cholesky(mat: torch.Tensor, jitter: float = 1e-6, max_tries: int = 5) -
     w_clamped = torch.clamp(w, min=jitter)
     M_psd = V @ torch.diag_embed(w_clamped) @ V.mH
     return torch.linalg.cholesky(M_psd)
-

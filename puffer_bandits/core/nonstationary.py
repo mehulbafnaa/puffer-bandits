@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import math
 
@@ -101,4 +100,3 @@ def ucb_scores(Q: torch.Tensor, N: torch.Tensor, c: float, t: int) -> torch.Tens
     """
     logt = math.log(max(int(t), 1))
     return Q + c * torch.sqrt(torch.tensor(logt, device=Q.device, dtype=Q.dtype) / N.clamp_min(1.0))
-

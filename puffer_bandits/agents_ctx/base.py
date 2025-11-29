@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -40,4 +39,3 @@ class CtxAgent:
     @torch.no_grad()
     def update(self, actions: torch.LongTensor, rewards: torch.Tensor, obs: torch.Tensor | None = None) -> None:
         raise NotImplementedError
-

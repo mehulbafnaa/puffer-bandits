@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 from .base import CtxAgentCfg, CtxAgent, pick_device
 from .lin import LinUCB, LinTS
@@ -16,4 +15,3 @@ __all__ = [
     "NeuralTS",
     "NeuralLinearTS",
 ]
-

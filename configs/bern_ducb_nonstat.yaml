@@ -1,0 +1,30 @@
+runner: classic
+algo: ducb
+
+# Problem size
+k: 10
+T: 1500
+runs: 1024
+seed: 0
+
+# Non-stationary env
+nonstationary: true
+sigma: 0.1
+
+# Agent (Discounted UCB)
+c: 2.0
+discount: 0.99
+
+# Vectorization & device
+num_workers: 8
+device: cpu
+log_every: 200
+
+# Output
+outdir: plots
+save_csv: true
+
+# Logging (optional)
+wandb: false
+wandb_project: puffer-bandits
+

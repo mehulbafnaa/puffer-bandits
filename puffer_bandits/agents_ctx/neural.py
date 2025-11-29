@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import torch
 import torch.nn as nn
@@ -213,4 +212,3 @@ class NeuralTS(CtxAgent):
             loss = torch.nn.functional.binary_cross_entropy_with_logits(logits, rb)
             loss.backward()
             optim.step()
-

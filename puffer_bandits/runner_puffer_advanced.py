@@ -1,10 +1,9 @@
-from __future__ import annotations
 
 import argparse
 import os
 import time
 import csv
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Literal
 
 import numpy as np
@@ -14,6 +13,7 @@ CORES = os.cpu_count() or 1
 
 from pufferlib.emulation import GymnasiumPufferEnv
 from pufferlib.vector import Multiprocessing
+from omegaconf import OmegaConf  # type: ignore
 
 from .agents_ctx import (
     EXP3,
@@ -72,7 +72,7 @@ class Config:
     amp: bool = True
     compile: bool = False
     # Output
-    outdir: str = "plots_gpu"
+    outdir: str = "plots"
     save_csv: bool = False
     debug_devices: bool = False
     profile: bool = False
@@ -87,38 +87,38 @@ class Config:
 
 def parse_args() -> Config:
     p = argparse.ArgumentParser("Advanced contextual/adversarial bandits (PufferLib)")
-    p.add_argument("--algo", type=str, choices=["linucb", "lints", "exp3", "exp3ix", "neuralts", "neurallinear"], default="linucb")
-    p.add_argument("--env", type=str, choices=["contextual", "bernoulli"], default="contextual")
-    p.add_argument("--k", type=int, default=10)
-    p.add_argument("--d", type=int, default=8)
-    p.add_argument("--T", type=int, default=1000)
-    p.add_argument("--runs", type=int, default=4096)
-    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--algo", type=str, choices=["linucb", "lints", "exp3", "exp3ix", "neuralts", "neurallinear"], default=None)
+    p.add_argument("--env", type=str, choices=["contextual", "bernoulli"], default=None)
+    p.add_argument("--k", type=int, default=None)
+    p.add_argument("--d", type=int, default=None)
+    p.add_argument("--T", type=int, default=None)
+    p.add_argument("--runs", type=int, default=None)
+    p.add_argument("--seed", type=int, default=None)
     p.add_argument("--nonstationary", action="store_true")
-    p.add_argument("--sigma", type=float, default=0.1, help="non-stationary reward sigma (bernoulli)")
-    p.add_argument("--theta-sigma", type=float, default=0.05, help="non-stationary theta sigma (contextual)")
-    p.add_argument("--x-sigma", type=float, default=1.0)
+    p.add_argument("--sigma", type=float, default=None, help="non-stationary reward sigma (bernoulli)")
+    p.add_argument("--theta-sigma", type=float, default=None, help="non-stationary theta sigma (contextual)")
+    p.add_argument("--x-sigma", type=float, default=None)
     # Agent params
-    p.add_argument("--alpha", type=float, default=1.0)
-    p.add_argument("--lam", type=float, default=1.0)
-    p.add_argument("--v", type=float, default=0.1)
-    p.add_argument("--gamma", type=float, default=0.07)
+    p.add_argument("--alpha", type=float, default=None)
+    p.add_argument("--lam", type=float, default=None)
+    p.add_argument("--v", type=float, default=None)
+    p.add_argument("--gamma", type=float, default=None)
     p.add_argument("--eta", type=float, default=None)
-    p.add_argument("--hidden", type=int, default=128)
-    p.add_argument("--depth", type=int, default=2)
-    p.add_argument("--ensembles", type=int, default=5)
-    p.add_argument("--dropout", type=float, default=0.1)
-    p.add_argument("--lr", type=float, default=1e-3)
-    p.add_argument("--features", type=int, default=64, help="NeuralLinear feature dim m")
-    p.add_argument("--linlam", type=float, default=1.0, help="NeuralLinear ridge lam")
-    p.add_argument("--linv", type=float, default=0.1, help="NeuralLinear TS scale v")
+    p.add_argument("--hidden", type=int, default=None)
+    p.add_argument("--depth", type=int, default=None)
+    p.add_argument("--ensembles", type=int, default=None)
+    p.add_argument("--dropout", type=float, default=None)
+    p.add_argument("--lr", type=float, default=None)
+    p.add_argument("--features", type=int, default=None, help="NeuralLinear feature dim m")
+    p.add_argument("--linlam", type=float, default=None, help="NeuralLinear ridge lam")
+    p.add_argument("--linv", type=float, default=None, help="NeuralLinear TS scale v")
     # Vectorization
     p.add_argument("--num-workers", type=int, default=None)
     p.add_argument("--batch-size", type=int, default=None)
     p.add_argument("--device", type=str, default=None)
-    p.add_argument("--log-every", type=int, default=100)
+    p.add_argument("--log-every", type=int, default=None)
     # Output
-    p.add_argument("--outdir", type=str, default="plots_gpu")
+    p.add_argument("--outdir", type=str, default=None)
     p.add_argument("--save-csv", action="store_true")
     p.add_argument("--debug-devices", action="store_true")
     p.add_argument("--profile", action="store_true")
@@ -132,17 +132,26 @@ def parse_args() -> Config:
     p.add_argument("--wandb-tags", type=str, default=None, help=",-separated tags")
     p.add_argument("--wandb-offline", action="store_true")
     p.add_argument("--run-name", type=str, default=None)
+    # Config-driven
+    p.add_argument("--config", type=str, default=None, help="Path to YAML/TOML config")
+    p.add_argument("--set", action="append", default=None, help="Override config with dotlist, e.g., runs=1024")
     args = p.parse_args()
-    return Config(
-        algo=args.algo, env=args.env, k=args.k, d=args.d, T=args.T, runs=args.runs, seed=args.seed,
-        nonstationary=args.nonstationary, sigma=args.sigma, theta_sigma=args.theta_sigma, x_sigma=args.x_sigma,
-        alpha=args.alpha, lam=args.lam, v=args.v, gamma=args.gamma, eta=args.eta,
-        hidden=args.hidden, depth=args.depth, ensembles=args.ensembles, dropout=args.dropout, lr=args.lr,
-        features=args.features, linlam=args.linlam, linv=args.linv,
-        num_workers=args.num_workers, batch_size=args.batch_size, device=args.device, log_every=args.log_every, force_device=bool(args.force_device), amp=bool(args.amp), compile=bool(args.compile),
-        outdir=args.outdir, save_csv=bool(args.save_csv), debug_devices=bool(args.debug_devices), profile=bool(args.profile),
-        wandb=bool(args.wandb), wandb_project=args.wandb_project, wandb_entity=args.wandb_entity, wandb_tags=args.wandb_tags, wandb_offline=bool(args.wandb_offline), run_name=args.run_name,
-    )
+    base = asdict(Config())
+    conf = OmegaConf.create(base)
+    if args.config:
+        conf = OmegaConf.merge(conf, OmegaConf.load(args.config))
+    if args.set:
+        conf = OmegaConf.merge(conf, OmegaConf.from_dotlist(args.set))
+    for key, val in vars(args).items():
+        if key in {"config", "set"}:
+            continue
+        if isinstance(val, bool):
+            if val:
+                conf[key] = val
+        elif val is not None:
+            conf[key] = val
+    cfg_dict = OmegaConf.to_container(conf, resolve=True)  # type: ignore
+    return Config(**cfg_dict)  # type: ignore[arg-type]
 
 
 def build_envs(cfg: Config) -> Multiprocessing:
@@ -161,8 +170,16 @@ def build_envs(cfg: Config) -> Multiprocessing:
             )) for _ in range(cfg.runs)
         ]
 
-    num_workers = cfg.num_workers if cfg.num_workers is not None else min(cfg.runs, CORES)
-    num_workers = max(1, min(num_workers, cfg.runs))
+    if cfg.num_workers is None:
+        candidate = min(cfg.runs, CORES)
+        while candidate > 1 and (cfg.runs % candidate) != 0:
+            candidate -= 1
+        num_workers = max(1, candidate)
+    else:
+        num_workers = max(1, min(cfg.num_workers, cfg.runs))
+        if (cfg.runs % num_workers) != 0:
+            print(f"[vector] runs={cfg.runs} not divisible by num_workers={num_workers}; using 1 worker.")
+            num_workers = 1
     return Multiprocessing(
         env_creators=env_creators,
         env_args=env_args,
@@ -192,8 +209,7 @@ def build_agent(cfg: Config, device: torch.device):
     raise ValueError("unknown algo")
 
 
-def main() -> None:
-    cfg = parse_args()
+def run_with_config(cfg: Config) -> None:
     device = pick_device(cfg.device)
     if (not cfg.force_device
         and device.type == "mps"
@@ -211,6 +227,12 @@ def main() -> None:
     # obs is numpy: contextual -> (runs,k,d), bernoulli -> scalar (ignored by agents that don't need it)
 
     agent = build_agent(cfg, device)
+    # Explicit per-agent RNG seed for determinism across devices
+    try:
+        agent.rng = torch.Generator(device=device)
+        agent.rng.manual_seed(int(cfg.seed))
+    except Exception:
+        pass
     agent.reset()
     if cfg.debug_devices:
         print("[device] torch backend device:", device)
@@ -240,35 +262,28 @@ def main() -> None:
     obs_buf = torch.empty((n, cfg.k, max(1, cfg.d)), device=device, dtype=torch.float32)
 
     # Optional Weights & Biases
-    wb = None
-    if cfg.wandb:
-        try:
-            import os as _os
-            import wandb as _wandb  # type: ignore
-            if cfg.wandb_offline:
-                _os.environ.setdefault("WANDB_MODE", "offline")
-            run_name = cfg.run_name or f"advanced-{cfg.env}-{cfg.algo}-k{cfg.k}-d{cfg.d}-n{cfg.runs}-{device}-{cfg.seed}"
-            wb_cfg = {
-                "runner": "advanced",
-                "env": cfg.env,
-                "algo": cfg.algo,
-                "k": cfg.k,
-                "d": cfg.d,
-                "T": cfg.T,
-                "runs": cfg.runs,
-                "device": str(device),
-                "seed": cfg.seed,
-            }
-            wb = _wandb.init(
-                project=cfg.wandb_project or "puffer-bandits",
-                entity=cfg.wandb_entity,
-                name=run_name,
-                config=wb_cfg,
-                tags=[t.strip() for t in (cfg.wandb_tags or "").split(",") if t.strip()],
-                reinit=True,
-            )
-        except Exception:
-            wb = None
+    from .utils.wandb import wb_init, wb_log, wb_finish
+    run_name = cfg.run_name or f"advanced-{cfg.env}-{cfg.algo}-k{cfg.k}-d{cfg.d}-n{cfg.runs}-{device}-{cfg.seed}"
+    wb_cfg = {
+        "runner": "advanced",
+        "env": cfg.env,
+        "algo": cfg.algo,
+        "k": cfg.k,
+        "d": cfg.d,
+        "T": cfg.T,
+        "runs": cfg.runs,
+        "device": str(device),
+        "seed": cfg.seed,
+    }
+    wb = wb_init(
+        enabled=cfg.wandb,
+        project=cfg.wandb_project,
+        entity=cfg.wandb_entity,
+        tags=cfg.wandb_tags,
+        run_name=run_name,
+        offline=cfg.wandb_offline,
+        config=wb_cfg,
+    )
 
     for t in range(1, T + 1):
         # Prepare obs for agent (if required). EXP3 ignores obs.
@@ -326,14 +341,7 @@ def main() -> None:
             mean_r = float(np.mean(r))
             print(f"t={t} mean_reward={mean_r:.4f}")
             if wb is not None:
-                try:
-                    import wandb as _wandb  # type: ignore
-                    _wandb.log({
-                        "t": t,
-                        "mean_reward": mean_r,
-                    }, step=t)
-                except Exception:
-                    pass
+                wb_log(wb, {"t": t, "mean_reward": mean_r}, step=t)
             if cfg.profile:
                 steps_done = t
                 ms = {k: 1000.0 * v / steps_done for k, v in prof.items()}
@@ -352,12 +360,9 @@ def main() -> None:
     if cfg.debug_devices:
         print(memory_stats())
     if wb is not None:
-        try:
-            import wandb as _wandb  # type: ignore
-            _wandb.finish()
-        except Exception:
-            pass
+        wb_finish(wb)
 
 
 if __name__ == "__main__":
-    main()
+    cfg = parse_args()
+    run_with_config(cfg)

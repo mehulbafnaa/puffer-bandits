@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import math
 
@@ -63,4 +62,3 @@ def klucb_upper_bound(
         high = torch.where(cond, high, mid)
     # low tracks the greatest feasible point (max u s.t. KL <= target)
     return low
-

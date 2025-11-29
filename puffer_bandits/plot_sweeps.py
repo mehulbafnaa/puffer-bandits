@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import argparse
 import csv
@@ -77,7 +76,7 @@ def main() -> None:
     ap.add_argument("--file", type=str, required=True, help="Path to CSV (summary.csv or advanced_summary.csv)")
     ap.add_argument("--algo", type=str, required=True)
     ap.add_argument("--param", type=str, required=True, help="Column to group by (e.g., kl_alpha, window, alpha, features)")
-    ap.add_argument("--out", type=str, default="plots_gpu/sweep_plot.png")
+    ap.add_argument("--out", type=str, default="plots/sweep_plot.png")
     args = ap.parse_args()
 
     rows = load_rows(args.file)
@@ -90,4 +89,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

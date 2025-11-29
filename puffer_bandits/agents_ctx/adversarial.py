@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import torch
 from ..core.adversarial import exp3_probs, exp3_update_factor, exp3ix_probs
@@ -79,4 +78,3 @@ class EXP3IX(CtxAgent):
     def reset(self) -> None:
         self.w.fill_(1.0)
         self._last_p = None
-

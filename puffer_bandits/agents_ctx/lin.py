@@ -1,4 +1,3 @@
-from __future__ import annotations
 
 import torch
 from ..core.linear import sherman_morrison_update
@@ -89,4 +88,3 @@ class LinTS(CtxAgent):
         Ainv_new = sherman_morrison_update(Ainv_sel, x_sel)
         self.A_inv[batch, idx, :, :] = Ainv_new
         self.b[batch, idx, :] = self.b[batch, idx, :] + (r * x_sel)
-
